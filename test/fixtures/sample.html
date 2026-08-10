@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture</title></head>
+<body>
+<h1>DataLayer QA capture fixture</h1>
+<script>
+  // Simulates a GTM-style bootstrap: `dataLayer.push = dataLayer.push || []` reuse pattern.
+  window.dataLayer = window.dataLayer || [];
+
+  // Immediate event, present at page-script-run time.
+  window.dataLayer.push({
+    event: 'page_loaded',
+    page: { content_group: 'Home page', content_type: 'buyers', currency: 'GBP' },
+    user: { signed_in_status: 'signed out', internal_traffic: false }
+  });
+
+  // Null-clear pattern push — no `event` key, should be filtered out of diffable events.
+  window.dataLayer.push({ search: null });
+
+  // A second immediate event.
+  window.dataLayer.push({
+    event: 'click_primary_logo',
+    click_url: 'https://example.com/',
+    click_text: undefined
+  });
+
+  // Debounced event — fires at 2200ms, close to the real ~2000ms "view_property_list" pattern.
+  // Tests that the settle heuristic's quiet window is long enough to catch this.
+  setTimeout(function () {
+    window.dataLayer.push({
+      event: 'view_property_list',
+      property_list_name: 'search results',
+      property_list_details: [
+        { property_id: 'P1', price: 250000, position: 1 },
+        { property_id: 'P2', price: 310000, position: 2 }
+      ]
+    });
+  }, 2200);
+</script>
+</body>
+</html>
