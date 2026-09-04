@@ -39,6 +39,9 @@ export function compareFieldsAgainstObject(
     const leaf = capturedLeaves.get(rule.path);
 
     if (!leaf) {
+      // An optional rule exists to mark the path as *known* (so it isn't reported as an
+      // unexpected field), not to require it.
+      if (rule.optional) continue;
       diffs.push({
         path: rule.path,
         kind: 'missing_field',
@@ -48,7 +51,8 @@ export function compareFieldsAgainstObject(
       continue;
     }
 
-    if (leaf.type !== rule.type) {
+    const allowedTypes = rule.anyOfTypes ?? [rule.type];
+    if (!allowedTypes.includes(leaf.type)) {
       diffs.push({
         path: rule.path,
         kind: 'type_mismatch',

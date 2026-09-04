@@ -38,7 +38,9 @@ describe('compareEventFields', () => {
     ]);
   });
 
-  it('flags a missing field when the value is explicitly undefined', () => {
+  it('flags a type mismatch (not a missing field) when the template expects a value but the field is explicitly undefined', () => {
+    // Distinct from the path being entirely absent (tested above) — the key was pushed,
+    // it just evaluated to undefined, which is worth telling apart from "never fired".
     const template: TemplateEvent = {
       eventName: 'click_button',
       occurrenceIndex: 0,
@@ -49,8 +51,28 @@ describe('compareEventFields', () => {
     };
     const captured: RawEvent = { event: 'click_button', click_section: undefined };
     expect(compareEventFields(template, captured)).toEqual([
-      { path: 'click_section', kind: 'missing_field', expectedType: 'string', expectedValue: undefined },
+      {
+        path: 'click_section',
+        kind: 'type_mismatch',
+        expectedType: 'string',
+        actualType: 'undefined',
+        expectedValue: undefined,
+        actualValue: undefined,
+      },
     ]);
+  });
+
+  it('passes when a template explicitly expects a field to be undefined and it is', () => {
+    const template: TemplateEvent = {
+      eventName: 'click_button',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'click_button' },
+        { path: 'click_section', classification: 'structural', type: 'undefined' },
+      ],
+    };
+    const captured: RawEvent = { event: 'click_button', click_section: undefined };
+    expect(compareEventFields(template, captured)).toEqual([]);
   });
 
   it('flags a type mismatch distinctly from a value mismatch', () => {

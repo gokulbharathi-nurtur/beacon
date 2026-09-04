@@ -1,4 +1,5 @@
 import type { LeafType } from '@/lib/types';
+import { UNDEFINED_MARKER } from '@/lib/capture/undefinedMarker';
 
 export interface FieldLeaf {
   path: string;
@@ -8,14 +9,17 @@ export interface FieldLeaf {
 
 /**
  * Recursively walks an object into dot-path leaves. Arrays are a single leaf at their
- * own path (not recursed into — V1 doesn't diff per-element array contents). `undefined`
- * values are dropped entirely so a field explicitly set to `undefined` (e.g. the real
- * `sidebar_open: undefined` pattern) and a field that's simply missing both read as
- * "field absent" to callers. `null` is its own LeafType since `typeof null === 'object'`.
+ * own path (not recursed into — V1 doesn't diff per-element array contents). A field
+ * explicitly set to `undefined` (e.g. the real `sidebar_open: undefined` pattern) — or
+ * its JSON-safe stand-in, UNDEFINED_MARKER, once this has round-tripped through DB/API
+ * JSON — becomes its own `'undefined'`-typed leaf rather than being silently dropped, so
+ * it's still distinguishable from a key that's simply absent (which still yields no leaf,
+ * an empty prefix meaning "nothing to flatten at all"). `null` is its own LeafType since
+ * `typeof null === 'object'`.
  */
 export function flattenToPaths(obj: unknown, prefix = ''): FieldLeaf[] {
-  if (obj === undefined) {
-    return [];
+  if (obj === undefined || obj === UNDEFINED_MARKER) {
+    return prefix ? [{ path: prefix, value: undefined, type: 'undefined' }] : [];
   }
   if (obj === null) {
     return [{ path: prefix, value: null, type: 'null' }];

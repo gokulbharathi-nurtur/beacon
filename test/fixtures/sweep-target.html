@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — click vs load event boundary</title></head>
+<body>
+<button id="track-btn">Track me</button>
+<button id="silent-btn">Silent button</button>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  document.getElementById('track-btn').addEventListener('click', function () {
+    window.dataLayer.push({ event: 'button_clicked' });
+  });
+  // #silent-btn deliberately has no listener — the "someone forgot to add tracking" case.
+</script>
+</body>
+</html>

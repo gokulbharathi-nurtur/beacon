@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { flattenToPaths } from './flatten';
+import { UNDEFINED_MARKER } from '@/lib/capture/undefinedMarker';
 
 describe('flattenToPaths', () => {
   it('flattens nested objects into dot-paths', () => {
@@ -37,10 +38,25 @@ describe('flattenToPaths', () => {
     expect(leaves).toEqual([{ path: 'search', value: null, type: 'null' }]);
   });
 
-  it('drops explicit undefined values entirely, same as a missing key', () => {
+  it('keeps an explicit undefined value as its own leaf, distinct from a missing key', () => {
     const withUndefined = flattenToPaths({ sidebar_open: undefined, click_text: 'Home' });
     const withoutKey = flattenToPaths({ click_text: 'Home' });
-    expect(withUndefined).toEqual(withoutKey);
+    expect(withUndefined).toEqual(
+      expect.arrayContaining([
+        { path: 'sidebar_open', value: undefined, type: 'undefined' },
+        { path: 'click_text', value: 'Home', type: 'string' },
+      ])
+    );
+    expect(withUndefined).toHaveLength(withoutKey.length + 1);
+  });
+
+  it('treats the JSON-safe undefined marker the same as a real undefined value', () => {
+    const leaves = flattenToPaths({ sidebar_open: UNDEFINED_MARKER });
+    expect(leaves).toEqual([{ path: 'sidebar_open', value: undefined, type: 'undefined' }]);
+  });
+
+  it('returns nothing for a wholly absent object, not a phantom top-level leaf', () => {
+    expect(flattenToPaths(undefined)).toEqual([]);
   });
 
   it('handles a fully flat event with only primitives', () => {
@@ -48,6 +64,7 @@ describe('flattenToPaths', () => {
     expect(leaves).toEqual([
       { path: 'event', value: 'click_button', type: 'string' },
       { path: 'click_text', value: 'Book now', type: 'string' },
+      { path: 'click_section', value: undefined, type: 'undefined' },
     ]);
   });
 });

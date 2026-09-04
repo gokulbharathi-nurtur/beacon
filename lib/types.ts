@@ -1,6 +1,6 @@
 // Shared types for capture + template + diff. Kept framework-free so lib/ has no Next.js imports.
 
-export type LeafType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+export type LeafType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'undefined';
 export type FieldClassification = 'exact' | 'structural';
 
 /** A single push captured off window.dataLayer. Only pushes shaped like { event: string, ... } are events. */
@@ -21,6 +21,18 @@ export interface CaptureResult {
   filteredPushCount: number;
   /** True if the hard ceiling fired instead of a natural quiet-period settle. */
   timedOut: boolean;
+  /** What the click selector resolved to immediately before clicking it — null when no
+   * clickSelector was given. Compare against a template's stored clickLabel/clickHref to
+   * catch a selector that now silently points at a different element (see
+   * lib/capture/discoverClickables.ts's describeClickTarget, which computes this). */
+  clickTarget: { label: string; href?: string; resolvedCount: number } | null;
+  /** Index into `events` where events caused by the click or driver interaction begin —
+   * everything before it is ambient load-time noise that interaction's own navigation
+   * re-triggered. Null when neither clickSelector nor interact was given, in which case
+   * the whole `events` array is load-time. A sweep uses
+   * `events.slice(eventsAfterInteractionIndex)` to judge what driving an element actually
+   * did, rather than crediting it with events the page would have fired anyway. */
+  eventsAfterInteractionIndex: number | null;
 }
 
 export interface TemplateFieldRule {
@@ -29,6 +41,23 @@ export interface TemplateFieldRule {
   classification: FieldClassification;
   /** Type captured at record time — basis for type-mismatch detection. */
   type: LeafType;
+  /**
+   * Optional — when set, the field may hold any of these types and `type` is only the
+   * primary one (used for display). Recorded templates never set this: a single recording
+   * observes one type per field. Catalog-derived rules do, because a field like
+   * `click_url` is genuinely `string | undefined` depending on whether the caller passed
+   * it, and collapsing that to one type would report a type mismatch on every legitimate
+   * omission.
+   */
+  anyOfTypes?: LeafType[];
+  /**
+   * Optional — when true, the field's absence is not a `missing_field`; every other check
+   * still applies when it *is* present. Recorded templates leave this unset (a field that
+   * was there at record time is expected to be there again). Catalog-derived rules set it
+   * for fields the package emits only sometimes, so those paths are still *known* — and
+   * therefore not reported as `unexpected_field` — without being required.
+   */
+  optional?: boolean;
   /** Present only when classification === 'exact'. */
   exactValue?: string | number | boolean | null;
   /**
@@ -107,7 +136,11 @@ export type FieldDiffKind =
   | 'array_count_mismatch'
   | 'string_contains_mismatch'
   | 'pattern_mismatch'
-  | 'value_not_in_set';
+  | 'value_not_in_set'
+  /** An unexpected field whose name is a near-miss for a real one — a likely typo. Carries
+   * the suggested path in `expectedValue`. Only produced by catalog audits, which know the
+   * full set of legitimate field names for an event; a recorded template does not. */
+  | 'misspelled_field';
 
 export interface FieldDiff {
   path: string;
@@ -130,6 +163,65 @@ export interface EventMatchResult {
   unexpected: Array<EventMatchEntry & { capturedEvent: RawEvent }>;
   countMismatches: Array<{ eventName: string; expectedCount: number; actualCount: number }>;
 }
+
+export type AuditEventStatus =
+  /** Matched a catalog entry with no findings. */
+  | 'clean'
+  /** Matched a catalog entry and broke it. */
+  | 'violations'
+  /** Not an event name the analytics package can emit — a typo, or drift from the spec. */
+  | 'unknown_event'
+  /** A real event name the package's own suite never pushes, so there is no shape to check. */
+  | 'unchecked';
+
+export interface AuditEventResult {
+  /** Position in captured push order. Audits check each event on its own, so unlike a
+   * template diff there is no occurrence pairing to do. */
+  index: number;
+  eventName: string;
+  status: AuditEventStatus;
+  fieldDiffs: FieldDiff[];
+  capturedEvent: RawEvent;
+  /** How many catalog samples backed this check — the strength of the evidence behind any
+   * `missing_field` finding. Absent when no catalog entry matched. */
+  sampleCount?: number;
+}
+
+/**
+ * The result of checking a capture against the canonical event catalog rather than a
+ * recorded template. Needs no template, so it works on any page immediately.
+ */
+export interface AuditResult {
+  /** Which spec the capture was judged against. */
+  packageName: string;
+  packageVersion: string;
+  summary: {
+    total: number;
+    clean: number;
+    violations: number;
+    unknownEvents: number;
+    unchecked: number;
+  };
+  events: AuditEventResult[];
+}
+
+/**
+ * One row parsed from an uploaded content-map spreadsheet — the reference table mapping a
+ * family of URLs to the `page.content_group`/`content_id`/`content_type` values the
+ * `page_loaded` event should carry there. `null` on any expected* field means that cell was
+ * blank in the sheet ("not specified" — not checked); the literal string `'undefined'`
+ * means the cell said so verbatim, which is checked against a real JS `undefined` value
+ * (see lib/capture/undefinedMarker.ts) rather than skipped.
+ */
+export interface ContentMapRuleData {
+  rawPagesText: string;
+  patterns: string[];
+  contentGroup: string | null;
+  contentId: string | null;
+  contentType: string | null;
+}
+
+export type ContentCheckResultStatus = 'pass' | 'fail' | 'no_rule' | 'no_page_load_event';
 
 export interface DiffResult {
   summary: {

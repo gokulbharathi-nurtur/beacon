@@ -33,6 +33,7 @@ describe('buildExpectedJson', () => {
         { path: 'property_details.position', classification: 'structural', type: 'number' },
         { path: 'property_list_details', classification: 'structural', type: 'array' },
         { path: 'search', classification: 'structural', type: 'null' },
+        { path: 'sidebar_open', classification: 'structural', type: 'undefined' },
       ],
     };
 
@@ -41,6 +42,7 @@ describe('buildExpectedJson', () => {
       property_details: { price: '<number>', position: '<number>' },
       property_list_details: '<array, non-empty>',
       search: null,
+      sidebar_open: '<undefined>',
     });
   });
 

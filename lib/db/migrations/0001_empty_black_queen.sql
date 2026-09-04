@@ -1,0 +1,1 @@
+ALTER TABLE `templates` ADD `category` text DEFAULT 'click' NOT NULL;

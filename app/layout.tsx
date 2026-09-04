@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { BeaconMark } from "@/app/components/BeaconMark";
+import { SectionNav } from "@/app/components/SectionNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,33 +45,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <header className="border-b border-border">
-          <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+          <div className="mx-auto flex max-w-360 items-center gap-6 px-4 py-3">
             <Link href="/" className="flex items-center gap-2">
               <BeaconMark className="size-7 rounded-md" />
               <span className="flex items-baseline gap-1.5">
                 <span className="font-semibold tracking-tight">Beacon</span>
               </span>
             </Link>
-            <nav className="flex gap-4 text-sm text-muted-foreground">
-              <Link
-                href="/"
-                className="transition-colors hover:text-foreground"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/templates"
-                className="transition-colors hover:text-foreground"
-              >
-                Templates
-              </Link>
-            </nav>
+            <SectionNav />
             <div className="ml-auto">
               <ThemeToggle />
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+        <main className="mx-auto w-full max-w-360 flex-1 px-4 py-8">
           {children}
         </main>
       </body>

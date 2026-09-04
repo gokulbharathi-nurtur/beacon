@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>SPA driver fixture</title></head>
+<body>
+<a href="/spa-site/spa-page.html" id="spa-link">Client-side nav</a>
+<a href="/spa-site/hard-page.html" id="hard-link">Hard nav</a>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  // Simulates a client-side router intercepting the click: no real navigation, just a
+  // history entry and whatever the site's own route-change tracking would re-fire.
+  document.getElementById('spa-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    history.pushState({}, '', '/spa-site/spa-page.html');
+    window.dataLayer.push({ event: 'page_loaded' });
+  });
+  // #hard-link deliberately has no listener — falls through to a real navigation.
+</script>
+</body>
+</html>

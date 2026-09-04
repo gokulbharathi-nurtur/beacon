@@ -72,6 +72,15 @@ describe('fieldRuleSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts type 'undefined' for a field that's explicitly present-but-undefined", () => {
+    const result = fieldRuleSchema.safeParse({
+      path: 'sidebar_open',
+      classification: 'structural',
+      type: 'undefined',
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('accepts a rule with nested itemFields carrying their own valid patterns', () => {
     const result = fieldRuleSchema.safeParse({
       path: 'property_list_details',

@@ -38,6 +38,9 @@ export function inferDefaultClassification(
       // Enum-like strings are expected to be caught by name patterns above, not guessed
       // from value shape.
       return { classification: 'structural' };
+    case 'undefined':
+      // No meaningful "exact value" beyond undefined itself — always structural.
+      return { classification: 'structural' };
     case 'object':
     default:
       // flatten() never emits a leaf for a plain object — only its leaves are classified.

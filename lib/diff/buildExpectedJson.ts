@@ -45,6 +45,8 @@ function placeholderFor(field: TemplateFieldRule): unknown {
         : '<array, non-empty>';
     case 'null':
       return null;
+    case 'undefined':
+      return '<undefined>';
     case 'object':
     default:
       return '<object>';

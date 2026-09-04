@@ -1,58 +1,43 @@
-import type { Page } from 'playwright';
+import type { PushStream } from './pushStream';
 
-export interface PollUntilSettledOptions {
-  /** How long the captured array must stop growing before we call it settled. */
+export interface WaitUntilQuietOptions {
+  /** How long the stream must go without a new push before we call it settled. */
   quietMs: number;
   /** Absolute ceiling — fires even if pushes are still arriving, so a broken page can't hang forever. */
   hardTimeoutMs: number;
-  pollIntervalMs: number;
 }
 
 /**
- * Polls the captured-pushes array length until it stops growing for `quietMs`,
- * or bails at `hardTimeoutMs`. This is a heuristic, not a fixed wait: some events
- * fire immediately, others (debounced ones — a real one waits ~2000ms) fire late,
- * so `quietMs` must be measured *after* the last observed push, not from navigation start.
+ * Resolves once `quietMs` has passed with no push on `stream`, or `hardTimeoutMs` total has
+ * elapsed, whichever comes first — a heuristic, not a fixed wait: some events fire
+ * immediately, others (debounced ones — a real one waits ~2000ms) fire late, so the quiet
+ * window is measured after the last observed push, not from navigation start.
+ *
+ * Driven by the stream's 'push' event rather than polling a page-side value: with pushes
+ * streamed to Node via exposeBinding (see injectCapture.ts), there is nothing left on the
+ * page to poll, and this function never touches the page at all, so — unlike the old
+ * page.evaluate-based poll — it cannot throw because the page navigated or closed mid-wait.
  */
-export async function pollUntilSettled(
-  page: Page,
-  captureKey: string,
-  opts: PollUntilSettledOptions
-): Promise<{ settledNaturally: boolean }> {
-  const { quietMs, hardTimeoutMs, pollIntervalMs } = opts;
-  const start = Date.now();
-  let lastLength = await readCaptureLength(page, captureKey);
-  let lastChangeAt = Date.now();
+export function waitUntilQuiet(stream: PushStream, opts: WaitUntilQuietOptions): Promise<{ settledNaturally: boolean }> {
+  const { quietMs, hardTimeoutMs } = opts;
 
-  while (true) {
-    const now = Date.now();
-    if (now - lastChangeAt >= quietMs) {
-      return { settledNaturally: true };
-    }
-    if (now - start >= hardTimeoutMs) {
-      return { settledNaturally: false };
+  return new Promise((resolve) => {
+    let quietTimer: ReturnType<typeof setTimeout>;
+
+    function armQuietTimer() {
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => finish(true), quietMs);
     }
 
-    await page.waitForTimeout(pollIntervalMs);
-
-    let currentLength: number;
-    try {
-      currentLength = await readCaptureLength(page, captureKey);
-    } catch {
-      // Page navigated away/closed mid-poll — treat as settled with whatever we last saw.
-      return { settledNaturally: true };
+    function finish(settledNaturally: boolean) {
+      clearTimeout(quietTimer);
+      clearTimeout(hardTimer);
+      stream.off('push', armQuietTimer);
+      resolve({ settledNaturally });
     }
 
-    if (currentLength !== lastLength) {
-      lastLength = currentLength;
-      lastChangeAt = Date.now();
-    }
-  }
-}
-
-async function readCaptureLength(page: Page, captureKey: string): Promise<number> {
-  return page.evaluate((key) => {
-    const arr = (window as unknown as Record<string, unknown[]>)[key];
-    return Array.isArray(arr) ? arr.length : 0;
-  }, captureKey);
+    const hardTimer = setTimeout(() => finish(false), hardTimeoutMs);
+    armQuietTimer();
+    stream.on('push', armQuietTimer);
+  });
 }

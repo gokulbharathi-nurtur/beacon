@@ -6,6 +6,7 @@ import { Loader2, Play, RefreshCw, Trash2, Save, ChevronRight } from 'lucide-rea
 import type { TemplateRow } from '@/lib/db/schema';
 import type { TemplateEvent, TemplateFieldRule } from '@/lib/types';
 import { sanitizeTemplateEvents } from '@/lib/diff/sanitizeTemplateEvents';
+import { getCategoryByValue } from '@/lib/eventCategories';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ import {
 
 export function TemplateEditor({ template }: { template: TemplateRow }) {
   const router = useRouter();
+  const categorySlug = getCategoryByValue(template.category)!.slug;
   const [name, setName] = useState(template.name);
   const [events, setEvents] = useState<TemplateEvent[]>(template.events);
   const [dirty, setDirty] = useState(false);
@@ -54,6 +56,29 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
       const seed = field.type === 'boolean' ? false : field.type === 'number' ? 0 : field.type === 'null' ? null : '';
       updateField(eventIdx, fieldIdx, { classification: 'exact', exactValue: seed });
     }
+  }
+
+  function removeField(eventIdx: number, fieldIdx: number) {
+    setEvents((prev) =>
+      prev.map((ev, i) => (i !== eventIdx ? ev : { ...ev, fields: ev.fields.filter((_, j) => j !== fieldIdx) }))
+    );
+    setDirty(true);
+  }
+
+  function removeItemField(eventIdx: number, fieldIdx: number, itemFieldIdx: number) {
+    setEvents((prev) =>
+      prev.map((ev, i) =>
+        i !== eventIdx
+          ? ev
+          : {
+              ...ev,
+              fields: ev.fields.map((f, j) =>
+                j !== fieldIdx || !f.itemFields ? f : { ...f, itemFields: f.itemFields.filter((_, k) => k !== itemFieldIdx) }
+              ),
+            }
+      )
+    );
+    setDirty(true);
   }
 
   function toggleItemsExpanded(eventIdx: number, fieldIdx: number) {
@@ -120,7 +145,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
   async function deleteTemplate() {
     setBusy(true);
     await fetch(`/api/templates/${template.id}`, { method: 'DELETE' });
-    router.push('/templates');
+    router.push(`/${categorySlug}/templates`);
   }
 
   async function reRecord() {
@@ -130,7 +155,11 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: template.sourceUrl, mode: 'record' }),
+        body: JSON.stringify({
+          url: template.sourceUrl,
+          mode: 'record',
+          ...(template.clickSelector ? { clickSelector: template.clickSelector } : {}),
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -144,7 +173,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
         name: template.name,
         url: template.sourceUrl,
       });
-      router.push(`/templates/new?${params.toString()}`);
+      router.push(`/${categorySlug}/templates/new?${params.toString()}`);
     } catch {
       setError('Failed to start re-record — is the server reachable?');
       setBusy(false);
@@ -240,11 +269,12 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                   <TableHead>Exact match?</TableHead>
                   <TableHead>Expected value</TableHead>
                   <TableHead>Rules</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {ev.fields.map((f, fieldIdx) => {
-                  const canBeExact = f.type !== 'array' && f.type !== 'object';
+                  const canBeExact = f.type !== 'array' && f.type !== 'object' && f.type !== 'undefined';
                   const hasItemFields = f.type === 'array' && (f.itemFields?.length ?? 0) > 0;
                   const expandKey = `${eventIdx}:${fieldIdx}`;
                   const expanded = hasItemFields && expandedItemFields.has(expandKey);
@@ -278,7 +308,9 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                             <ExactValueInput field={f} onChange={(exactValue) => updateField(eventIdx, fieldIdx, { exactValue })} />
                           ) : (
                             <span className="text-xs text-muted-foreground">
-                              (any {f.type}, {f.allowEmpty ? 'may be empty' : 'non-empty'})
+                              {f.type === 'undefined'
+                                ? '(present, value is undefined)'
+                                : `(any ${f.type}, ${f.allowEmpty ? 'may be empty' : 'non-empty'})`}
                             </span>
                           )}
                         </TableCell>
@@ -295,10 +327,22 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => removeField(eventIdx, fieldIdx)}
+                            aria-label={`Remove ${f.path} from this template`}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                       {expanded && (
                         <TableRow>
-                          <TableCell colSpan={5} className="bg-muted/30 p-3">
+                          <TableCell colSpan={6} className="bg-muted/30 p-3">
                             <p className="mb-2 text-xs text-muted-foreground">
                               Rules for every item in <span className="font-mono">{f.path}</span>.
                             </p>
@@ -310,11 +354,12 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                                   <TableHead>Exact match?</TableHead>
                                   <TableHead>Expected value</TableHead>
                                   <TableHead>Rules</TableHead>
+                                  <TableHead />
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {(f.itemFields ?? []).map((itf, itemFieldIdx) => {
-                                  const itemCanBeExact = itf.type !== 'array' && itf.type !== 'object';
+                                  const itemCanBeExact = itf.type !== 'array' && itf.type !== 'object' && itf.type !== 'undefined';
                                   return (
                                     <TableRow key={itf.path}>
                                       <TableCell className="whitespace-normal break-all font-mono">{itf.path}</TableCell>
@@ -334,7 +379,9 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                                           />
                                         ) : (
                                           <span className="text-xs text-muted-foreground">
-                                            (any {itf.type}, {itf.allowEmpty ? 'may be empty' : 'non-empty'})
+                                            {itf.type === 'undefined'
+                                              ? '(present, value is undefined)'
+                                              : `(any ${itf.type}, ${itf.allowEmpty ? 'may be empty' : 'non-empty'})`}
                                           </span>
                                         )}
                                       </TableCell>
@@ -345,6 +392,18 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                                           value={itf}
                                           onChange={(patch) => updateItemField(eventIdx, fieldIdx, itemFieldIdx, patch)}
                                         />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-xs"
+                                          className="text-muted-foreground hover:text-destructive"
+                                          onClick={() => removeItemField(eventIdx, fieldIdx, itemFieldIdx)}
+                                          aria-label={`Remove ${itf.path} from this template`}
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </Button>
                                       </TableCell>
                                     </TableRow>
                                   );

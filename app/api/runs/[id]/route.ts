@@ -4,7 +4,8 @@ import { db } from '@/lib/db/client';
 import { runs, templates } from '@/lib/db/schema';
 import { computeDiff } from '@/lib/diff/computeDiff';
 import { buildTemplateFromCapture } from '@/lib/diff/buildTemplateFromCapture';
-import type { DiffResult, TemplateDefinition } from '@/lib/types';
+import { auditCapture } from '@/lib/catalog/auditCapture';
+import type { AuditResult, DiffResult, TemplateDefinition } from '@/lib/types';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,5 +31,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     suggestedTemplate = buildTemplateFromCapture(run.capturedEvents);
   }
 
-  return NextResponse.json({ run, diff, suggestedTemplate });
+  // Also computed on read, for the same reason as the diff above: regenerating the catalog
+  // re-judges every past audit against the current spec rather than freezing old verdicts.
+  let audit: AuditResult | null = null;
+  if (run.mode === 'audit' && run.status === 'complete' && run.capturedEvents) {
+    audit = auditCapture(run.capturedEvents);
+  }
+
+  return NextResponse.json({ run, diff, suggestedTemplate, audit });
 }

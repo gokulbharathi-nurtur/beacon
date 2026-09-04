@@ -1,0 +1,1 @@
+ALTER TABLE `content_checks` ADD `mode` text DEFAULT 'site' NOT NULL;

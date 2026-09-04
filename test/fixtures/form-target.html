@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><title>Form driver fixture</title></head>
+<body>
+<form id="enquiry-form">
+  <input type="text" name="first_name" required />
+  <input type="text" name="last_name" required />
+  <input type="email" name="email" required />
+  <input type="tel" name="phone" />
+  <textarea name="message"></textarea>
+  <select name="branch">
+    <option value="">Please select</option>
+    <option value="leeds">Leeds</option>
+    <option value="york">York</option>
+  </select>
+  <label><input type="checkbox" name="agree_terms" required /> I agree to the terms</label>
+  <label><input type="checkbox" name="newsletter" /> Subscribe to the newsletter</label>
+  <input type="hidden" name="source" value="fixture" />
+  <button type="submit">Send</button>
+</form>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  document.getElementById('enquiry-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    window.dataLayer.push({ event: 'form_submit' });
+  });
+</script>
+</body>
+</html>

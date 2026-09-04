@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
       .values({
         name: parsed.data.name,
         sourceUrl: parsed.data.sourceUrl,
+        category: parsed.data.category,
+        clickSelector: parsed.data.clickSelector ?? null,
+        clickLabel: parsed.data.clickLabel ?? null,
+        clickHref: parsed.data.clickHref ?? null,
         events: parsed.data.events,
       })
       .returning();

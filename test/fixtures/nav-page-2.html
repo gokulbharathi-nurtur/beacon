@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — navigation, page 2</title></head>
+<body>
+<h1>Page 2</h1>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'nav_page_2_loaded' });
+
+  // A debounced push after the navigation, to prove the quiet window is measured from the
+  // last push across the whole run, not reset (or worse, wrongly closed) by the navigation.
+  setTimeout(function () {
+    window.dataLayer.push({ event: 'nav_page_2_debounced' });
+  }, 1200);
+</script>
+</body>
+</html>

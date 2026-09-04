@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head><title>Scroll driver fixture</title></head>
+<body>
+<div style="height: 2000px"></div>
+<div class="property-list">
+  <div class="card">1</div>
+  <div class="card">2</div>
+  <div class="card">3</div>
+  <div class="card">4</div>
+</div>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  var list = document.querySelector('.property-list');
+  var observer = new IntersectionObserver(function (entries) {
+    if (entries[0].isIntersecting) {
+      window.dataLayer.push({ event: 'view_property_list' });
+      observer.disconnect();
+    }
+  });
+  observer.observe(list);
+</script>
+</body>
+</html>

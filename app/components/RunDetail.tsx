@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CircleAlert, Loader2, ArrowRight } from 'lucide-react';
-import type { DiffResult, RawEvent, TemplateDefinition } from '@/lib/types';
+import { ChevronRight, CircleAlert, Loader2, ArrowRight, TriangleAlert } from 'lucide-react';
+import type { AuditResult, DiffResult, RawEvent, TemplateDefinition } from '@/lib/types';
 import type { RunRow } from '@/lib/db/schema';
+import { EVENT_CATEGORIES } from '@/lib/eventCategories';
+import { unmarkForDisplay } from '@/lib/capture/undefinedMarker';
+import { computeClickDrift } from '@/lib/runs/clickDrift';
 import { StatusBadge } from './StatusBadge';
 import { DiffView } from './DiffView';
+import { AuditView } from './AuditView';
 import { JsonCompareView } from './JsonCompareView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +20,7 @@ interface RunResponse {
   run: RunRow;
   diff: DiffResult | null;
   suggestedTemplate: TemplateDefinition | null;
+  audit: AuditResult | null;
 }
 
 const POLL_INTERVAL_MS = 1500;
@@ -32,7 +37,11 @@ export function RunDetail({ runId }: { runId: string }) {
       const res = await fetch(`/api/runs/${runId}`, { cache: 'no-store' });
       if (cancelled) return;
       if (!res.ok) return;
-      const body: RunResponse = await res.json();
+      // Undefined-valued captured fields survive the DB/API JSON round-trip as a marker
+      // string (see lib/capture/undefinedMarker.ts) — swap it back to real `undefined`
+      // here so the raw-JSON/JsonTree views below render it via their existing
+      // `value === undefined` handling instead of showing the marker literally.
+      const body: RunResponse = unmarkForDisplay(await res.json()) as RunResponse;
       if (cancelled) return;
       setData(body);
 
@@ -57,7 +66,8 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }
 
-  const { run, diff } = data;
+  const { run, diff, audit } = data;
+  const clickDrift = computeClickDrift(run);
 
   return (
     <div className="space-y-6">
@@ -88,6 +98,16 @@ export function RunDetail({ runId }: { runId: string }) {
         </div>
       )}
 
+      {clickDrift && (
+        <div className="flex items-start gap-2 rounded-md bg-status-warning/10 px-4 py-3 text-sm text-amber-700 ring-1 ring-status-warning/25 dark:text-status-warning">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-medium">Click target may have drifted</p>
+            <p className="mt-0.5 text-xs opacity-90">{clickDrift.message}</p>
+          </div>
+        </div>
+      )}
+
       {run.status === 'complete' && run.mode === 'diff' && diff && (
         <Tabs defaultValue="structured">
           <TabsList variant="line">
@@ -102,6 +122,8 @@ export function RunDetail({ runId }: { runId: string }) {
           </TabsContent>
         </Tabs>
       )}
+
+      {run.status === 'complete' && run.mode === 'audit' && audit && <AuditView audit={audit} />}
 
       {run.status === 'complete' && run.mode === 'record' && (
         <RecordSummary events={run.capturedEvents ?? []} nonEventPushCount={run.nonEventPushCount ?? 0} runId={run.id} />
@@ -163,7 +185,7 @@ function RecordSummary({ events, nonEventPushCount, runId }: { events: RawEvent[
           </ul>
         </CardContent>
       </Card>
-      <Button render={<Link href={`/templates/new?runId=${runId}`} />} nativeButton={false}>
+      <Button render={<Link href={`/${EVENT_CATEGORIES[0].slug}/templates/new?runId=${runId}`} />} nativeButton={false}>
         Continue — review &amp; save as template
         <ArrowRight className="size-4" />
       </Button>
