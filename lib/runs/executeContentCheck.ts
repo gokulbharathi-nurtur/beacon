@@ -4,8 +4,8 @@ import { contentChecks, contentCheckResults, contentMapRules } from '@/lib/db/sc
 import { getBrowser } from '@/lib/browser';
 import { getQueue } from '@/lib/queue';
 import { runCapture } from '@/lib/capture/injectCapture';
-import { enumeratePages } from '@/lib/sweep/enumeratePages';
-import { sampleBucket } from '@/lib/sweep/classifyPages';
+import { enumeratePages } from '@/lib/crawl/enumeratePages';
+import { sampleBucket } from '@/lib/crawl/sampleBucket';
 import { compileContentRule, buildFieldRules } from '@/lib/content/contentRules';
 import { findMatchingRule, type CompiledContentRule } from '@/lib/content/patternMatch';
 import { compareFieldsAgainstObject } from '@/lib/diff/compareFields';
@@ -23,24 +23,20 @@ const MAX_PAGES_PER_RULE = 1;
 // A handful of examples is enough to show "this part of the site has no matching row in
 // the reference table" without flooding results on a large, mostly-uncovered site.
 const MAX_UNMATCHED_SAMPLES = 10;
-// Deliberately not shortened the way executeSweep's SETTLE_QUIET_MS is: a sweep drives
-// dozens of captures per page (one per clickable element) so it trades quiet-window margin
-// for throughput, but a content check only ever does one load pass per page — there's no
-// multiplier making that trade worth it. Cutting the margin here caused real misses: on a
-// real production site (chartersestateagents.co.uk — see injectCapture.ts's own
-// DEFAULT_QUIET_MS comment for this site's previously-measured timing), page_loaded was
-// observed firing ~2.3-2.7s after navigation with a single uncontended browser context;
-// under this pipeline's real concurrency (two pages loading at once through the shared
-// queue), that regularly crept past a 3000ms quiet window and got cut off before the
-// page_loaded push ever arrived — a false "no page_load event" on pages that do fire it.
-// Reusing runCapture's own proven defaults (not passing settleQuietMs/hardTimeoutMs at all)
-// removes that gap entirely.
+// A content check does one load pass per page, so it reuses runCapture's own proven
+// defaults (not passing settleQuietMs/hardTimeoutMs at all) rather than a shortened
+// quiet window. Cutting the margin here caused real misses: on a real production site
+// (chartersestateagents.co.uk — see injectCapture.ts's own DEFAULT_QUIET_MS comment for
+// this site's previously-measured timing), page_loaded was observed firing ~2.3-2.7s
+// after navigation with a single uncontended browser context; under this pipeline's real
+// concurrency (two pages loading at once through the shared queue), that regularly crept
+// past a 3000ms quiet window and got cut off before the page_loaded push ever arrived — a
+// false "no page_load event" on pages that do fire it.
 
 /**
- * Runs in the background, off the HTTP request/response cycle — same shape as
- * executeSweep, including staying outside the shared browser-context queue for the same
- * reason (a long-lived orchestrator holding a concurrency slot for its entire duration
- * would starve the queue for its own per-page sub-tasks).
+ * Runs in the background, off the HTTP request/response cycle. Stays outside the shared
+ * browser-context queue: a long-lived orchestrator holding a concurrency slot for its
+ * entire duration would starve the queue for its own per-page sub-tasks.
  */
 export async function executeContentCheck(contentCheckId: string): Promise<void> {
   await db.update(contentChecks).set({ status: 'running', startedAt: new Date() }).where(eq(contentChecks.id, contentCheckId));
@@ -87,8 +83,8 @@ export async function executeContentCheck(contentCheckId: string): Promise<void>
 }
 
 /** 'site' mode's path: crawl the whole site, then bucket+sample the result. Records
- * pageSource/totalUrlsDiscovered as soon as the crawl finishes, same as executeSweep, so a
- * still-running check already shows how many pages it found. */
+ * pageSource/totalUrlsDiscovered as soon as the crawl finishes, so a still-running check
+ * already shows how many pages it found. */
 async function discoverSiteSamples(
   contentCheckId: string,
   baseUrl: string,
@@ -105,9 +101,8 @@ async function discoverSiteSamples(
 
 /**
  * Groups discovered URLs by which content-map rule (if any) matches them, then samples one
- * per group (MAX_UNMATCHED_SAMPLES for URLs no rule covers) — mirrors classifyPages+
- * sampleBucket in executeSweep, but bucketed by the user-supplied reference rows instead of
- * an auto-derived URL shape.
+ * per group (MAX_UNMATCHED_SAMPLES for URLs no rule covers), bucketed by the user-supplied
+ * reference rows.
  */
 function pickSamples(urls: string[], rules: CompiledContentRule[]): Array<{ url: string; rule: CompiledContentRule | null }> {
   const byRule = new Map<string | null, string[]>();

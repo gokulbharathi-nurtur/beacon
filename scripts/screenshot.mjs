@@ -3,9 +3,10 @@ import { chromium } from 'playwright';
 const BASE = process.argv[2] || 'http://localhost:3001';
 const OUT_DIR = process.argv[3] || '.';
 const PAGES = process.argv[4] ? JSON.parse(process.argv[4]) : [
-  { path: '/', name: 'dashboard' },
-  { path: '/templates', name: 'templates-list' },
-  { path: '/templates/new', name: 'templates-new' },
+  { path: '/load-events', name: 'dashboard' },
+  { path: '/load-events/templates', name: 'templates-list' },
+  { path: '/load-events/templates/new', name: 'templates-new' },
+  { path: '/load-events/content-check', name: 'content-check' },
 ];
 
 const browser = await chromium.launch();

@@ -3,9 +3,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 
 /**
- * Presentation shared by the template diff and the catalog audit. Both produce the same
- * `FieldDiff[]` vocabulary, so they render findings identically — only the surrounding
- * framing (matched-vs-expected events, or per-event catalog verdicts) differs.
+ * Presentation for a template diff's per-event findings. Every `FieldDiff` kind renders
+ * the same way — matched-vs-expected field, kind badge, expected/actual values.
  */
 
 const KIND_LABELS: Record<FieldDiff['kind'], string> = {
@@ -18,7 +17,6 @@ const KIND_LABELS: Record<FieldDiff['kind'], string> = {
   string_contains_mismatch: 'Contains mismatch',
   pattern_mismatch: 'Pattern mismatch',
   value_not_in_set: 'Not an allowed value',
-  misspelled_field: 'Likely misspelling',
 };
 
 const KIND_STYLES: Record<FieldDiff['kind'], string> = {
@@ -31,9 +29,6 @@ const KIND_STYLES: Record<FieldDiff['kind'], string> = {
   string_contains_mismatch: 'bg-status-warning/15 text-amber-700 dark:text-status-warning',
   pattern_mismatch: 'bg-status-warning/15 text-amber-700 dark:text-status-warning',
   value_not_in_set: 'bg-status-warning/15 text-amber-700 dark:text-status-warning',
-  // Critical rather than info: a near-miss field name is almost always a real bug, and the
-  // whole point of the audit is that a recorded template can never surface one.
-  misspelled_field: 'bg-status-critical/10 text-status-critical',
 };
 
 export function fmt(value: unknown): string {

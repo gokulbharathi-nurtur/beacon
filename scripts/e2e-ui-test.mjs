@@ -7,8 +7,8 @@ const FIXTURE_URL = process.argv[4] || 'http://localhost:4173/';
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
-console.log('1. Navigating to /templates/new');
-await page.goto(`${BASE}/templates/new`, { waitUntil: 'networkidle' });
+console.log('1. Navigating to /load-events/templates/new');
+await page.goto(`${BASE}/load-events/templates/new`, { waitUntil: 'networkidle' });
 
 console.log('2. Filling URL and clicking Capture');
 await page.fill('#url', FIXTURE_URL);
@@ -32,14 +32,14 @@ console.log('5. Filling template name and saving');
 await page.fill('#name', `E2E Test Template ${Date.now()}`);
 await page.click('button:has-text("Confirm & Save")');
 
-console.log('6. Waiting for redirect to /templates/[id]');
-await page.waitForURL(/\/templates\/[^/]+$/, { timeout: 10000 });
+console.log('6. Waiting for redirect to /load-events/templates/[id]');
+await page.waitForURL(/\/load-events\/templates\/[^/]+$/, { timeout: 10000 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT_DIR}/e2e-saved-template.png`, fullPage: true });
 console.log(`   Landed on ${page.url()}`);
 
 console.log('7. Navigating to dashboard, running a diff via the UI form');
-await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/load-events`, { waitUntil: 'networkidle' });
 await page.fill('#url', FIXTURE_URL);
 // pick the just-created template in the select
 await page.selectOption('#template', { label: (await page.locator('#template option').last().textContent()) ?? '' });

@@ -6,7 +6,6 @@ import { Loader2, Play, RefreshCw, Trash2, Save, ChevronRight } from 'lucide-rea
 import type { TemplateRow } from '@/lib/db/schema';
 import type { TemplateEvent, TemplateFieldRule } from '@/lib/types';
 import { sanitizeTemplateEvents } from '@/lib/diff/sanitizeTemplateEvents';
-import { getCategoryByValue } from '@/lib/eventCategories';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +28,6 @@ import {
 
 export function TemplateEditor({ template }: { template: TemplateRow }) {
   const router = useRouter();
-  const categorySlug = getCategoryByValue(template.category)!.slug;
   const [name, setName] = useState(template.name);
   const [events, setEvents] = useState<TemplateEvent[]>(template.events);
   const [dirty, setDirty] = useState(false);
@@ -145,7 +143,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
   async function deleteTemplate() {
     setBusy(true);
     await fetch(`/api/templates/${template.id}`, { method: 'DELETE' });
-    router.push(`/${categorySlug}/templates`);
+    router.push('/load-events/templates');
   }
 
   async function reRecord() {
@@ -155,11 +153,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: template.sourceUrl,
-          mode: 'record',
-          ...(template.clickSelector ? { clickSelector: template.clickSelector } : {}),
-        }),
+        body: JSON.stringify({ url: template.sourceUrl, mode: 'record' }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -173,7 +167,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
         name: template.name,
         url: template.sourceUrl,
       });
-      router.push(`/${categorySlug}/templates/new?${params.toString()}`);
+      router.push(`/load-events/templates/new?${params.toString()}`);
     } catch {
       setError('Failed to start re-record — is the server reachable?');
       setBusy(false);

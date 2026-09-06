@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { desc } from 'drizzle-orm';
-import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { runs, templates } from '@/lib/db/schema';
+import { runs } from '@/lib/db/schema';
 import { getQueue } from '@/lib/queue';
 import { executeRun } from '@/lib/runs/executeRun';
 import { assertValidTargetUrl, InvalidTargetUrlError } from '@/lib/urlGuard';
@@ -29,40 +28,12 @@ export async function POST(request: NextRequest) {
     throw err;
   }
 
-  // For diff mode, the click target is always derived from the template, not the
-  // client — RunForm has no UI to supply one, and re-clicking whatever the template
-  // recorded is the whole point of "run a check" against a click-event template.
-  // Record and audit modes take it from the client instead (the discovery picker on a
-  // first record, the template on a re-record, or the element an audit wants to exercise).
-  let clickSelector: string | null = parsed.data.clickSelector ?? null;
-  // What the template recorded — carried through so executeRun can compare it against
-  // what the selector actually resolves to live, without a second template lookup.
-  let clickLabel: string | null = null;
-  let clickHref: string | null = null;
-  if (mode === 'diff' && templateId) {
-    const [template] = await db.select().from(templates).where(eq(templates.id, templateId));
-    clickSelector = template?.clickSelector ?? null;
-    clickLabel = template?.clickLabel ?? null;
-    clickHref = template?.clickHref ?? null;
-  }
-
-  // Record mode only — diff/audit runs never carry a form driver, same reasoning as
-  // clickSelector above but stricter: re-submitting a form automatically on every future
-  // check is a real-world side effect this tool must never repeat on its own.
-  const formSelector = mode === 'record' ? (parsed.data.formSelector ?? null) : null;
-  const formAllowSubmit = mode === 'record' ? (parsed.data.formAllowSubmit ?? false) : false;
-
   const [run] = await db
     .insert(runs)
     .values({
       targetUrl: url,
       templateId: mode === 'diff' ? templateId : null,
       mode,
-      clickSelector,
-      clickLabel,
-      clickHref,
-      formSelector,
-      formAllowSubmit,
       status: 'queued',
     })
     .returning();

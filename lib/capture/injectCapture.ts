@@ -2,9 +2,8 @@ import type { Page } from 'playwright';
 import type { CaptureResult } from '@/lib/types';
 import { PushStream } from './pushStream';
 import { waitUntilQuiet } from './settle';
-import { isEventShaped, partitionPushes } from './filterEvents';
+import { partitionPushes } from './filterEvents';
 import { markUndefinedDeep } from './undefinedMarker';
-import { describeClickTarget } from './discoverClickables';
 
 export const CAPTURE_KEY = '__datalayerQaCapture';
 export const CAPTURE_BINDING = '__datalayerQaEmit';
@@ -23,7 +22,6 @@ const RESET_SIGNAL_KEY = '__datalayerQaReset';
 const DEFAULT_QUIET_MS = 5000;
 const DEFAULT_HARD_TIMEOUT_MS = 30_000;
 const DEFAULT_NAV_TIMEOUT_MS = 30_000;
-const DEFAULT_CLICK_TIMEOUT_MS = 5000;
 
 /**
  * Runs inside the browser via page.addInitScript, so it executes before any page JS —
@@ -73,24 +71,12 @@ export interface RunCaptureOptions {
   settleQuietMs?: number;
   hardTimeoutMs?: number;
   navTimeoutMs?: number;
-  /** Locator string clicked after page load, before the settle-wait begins (see below). */
-  clickSelector?: string | null;
-  clickTimeoutMs?: number;
-  /**
-   * General escape hatch for a driver interaction that isn't a single click — scrolling a
-   * list into view, filling and submitting a form (see lib/capture/drivers/) — run at the
-   * same point clickSelector's click would be. Ignored when clickSelector is also given,
-   * since that covers the common case directly. Its start time becomes the
-   * eventsAfterInteractionIndex boundary below, exactly like a click's does.
-   */
-  interact?: (page: Page) => Promise<void>;
 }
 
 export async function runCapture(page: Page, url: string, opts: RunCaptureOptions = {}): Promise<CaptureResult> {
   const quietMs = opts.settleQuietMs ?? DEFAULT_QUIET_MS;
   const hardTimeoutMs = opts.hardTimeoutMs ?? DEFAULT_HARD_TIMEOUT_MS;
   const navTimeoutMs = opts.navTimeoutMs ?? DEFAULT_NAV_TIMEOUT_MS;
-  const clickTimeoutMs = opts.clickTimeoutMs ?? DEFAULT_CLICK_TIMEOUT_MS;
 
   const startedAt = new Date().toISOString();
   const stream = new PushStream();
@@ -123,32 +109,6 @@ export async function runCapture(page: Page, url: string, opts: RunCaptureOption
   // page has already finished pushing everything to dataLayer.
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
 
-  let clickTarget: CaptureResult['clickTarget'] = null;
-  let interactionIssuedAt: number | null = null;
-  if (opts.clickSelector || opts.interact) {
-    // exposeBinding calls are delivered async relative to when the browser dispatched
-    // them — under load, Node's event loop can be busy enough that a push from *before*
-    // this point hasn't been processed yet, so its receivedAt would land after
-    // interactionIssuedAt and get wrongly credited to the interaction. A round-trip
-    // evaluate forces a sync point: CDP delivers messages on a given target in order, so
-    // by the time this resolves, every binding call dispatched earlier is guaranteed to
-    // have already reached (and been recorded by) the stream.
-    await page.evaluate(() => undefined);
-  }
-  if (opts.clickSelector) {
-    // Read what the selector resolves to right now, immediately before clicking it — this
-    // is the only point where "what we're about to click" can be compared against what a
-    // template recorded, to catch a selector that has quietly started pointing elsewhere.
-    clickTarget = await describeClickTarget(page, opts.clickSelector);
-    interactionIssuedAt = Date.now();
-    // No post-click navigation wait needed: pushes now stream to Node regardless of what
-    // the click does to the page, so there is nothing here that a navigation can disrupt.
-    await page.locator(opts.clickSelector).click({ timeout: clickTimeoutMs });
-  } else if (opts.interact) {
-    interactionIssuedAt = Date.now();
-    await opts.interact(page);
-  }
-
   const { settledNaturally } = await waitUntilQuiet(stream, { quietMs, hardTimeoutMs });
 
   await reconcileFromInPageArray(page, stream, lastNavAt);
@@ -164,32 +124,11 @@ export async function runCapture(page: Page, url: string, opts: RunCaptureOption
     events,
     filteredPushCount: nonEvents.length,
     timedOut: !settledNaturally,
-    clickTarget,
-    eventsAfterInteractionIndex: interactionIssuedAt === null ? null : indexOfFirstEventAtOrAfter(stream, interactionIssuedAt),
   };
 }
 
 function isResetSignal(item: unknown): boolean {
   return typeof item === 'object' && item !== null && (item as Record<string, unknown>)[RESET_SIGNAL_KEY] === true;
-}
-
-/**
- * Where in `events[]` the interaction's own contribution starts — everything before this
- * index is ambient load-time noise (page_loaded and friends refire on any navigation the
- * interaction causes, same as they did on the initial load), which a sweep needs to
- * exclude so it doesn't credit a silent element with events that were never actually
- * caused by driving it. Walks `stream.pushes` (1:1 order-aligned with `rawPushes`, so
- * counting event-shaped entries as it goes gives the matching index into the
- * already-filtered `events[]`) rather than re-deriving anything from the returned events
- * themselves.
- */
-function indexOfFirstEventAtOrAfter(stream: PushStream, thresholdMs: number): number {
-  let eventIndex = 0;
-  for (const entry of stream.pushes) {
-    if (entry.receivedAt >= thresholdMs) return eventIndex;
-    if (isEventShaped(entry.push)) eventIndex += 1;
-  }
-  return eventIndex;
 }
 
 /**

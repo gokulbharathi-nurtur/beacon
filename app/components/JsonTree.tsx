@@ -15,7 +15,6 @@ const KIND_LINE_STYLES: Record<FieldDiff['kind'], string> = {
   string_contains_mismatch: 'bg-status-warning/15 border-l-2 border-status-warning',
   pattern_mismatch: 'bg-status-warning/15 border-l-2 border-status-warning',
   value_not_in_set: 'bg-status-warning/15 border-l-2 border-status-warning',
-  misspelled_field: 'bg-status-critical/10 border-l-2 border-status-critical',
 };
 
 const KIND_TAG_STYLES: Record<FieldDiff['kind'], string> = {
@@ -28,7 +27,6 @@ const KIND_TAG_STYLES: Record<FieldDiff['kind'], string> = {
   string_contains_mismatch: 'text-amber-700 dark:text-status-warning',
   pattern_mismatch: 'text-amber-700 dark:text-status-warning',
   value_not_in_set: 'text-amber-700 dark:text-status-warning',
-  misspelled_field: 'text-status-critical',
 };
 
 const KIND_SHORT_LABELS: Record<FieldDiff['kind'], string> = {
@@ -41,7 +39,6 @@ const KIND_SHORT_LABELS: Record<FieldDiff['kind'], string> = {
   string_contains_mismatch: 'contains',
   pattern_mismatch: 'pattern',
   value_not_in_set: 'not-in-set',
-  misspelled_field: 'misspelled',
 };
 
 export type HighlightMap = Map<string, FieldDiff>;

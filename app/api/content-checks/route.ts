@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     .returning();
 
   // Not awaited, and deliberately not routed through the shared browser-context queue —
-  // see executeContentCheck's own doc comment (mirrors executeSweep's reasoning).
+  // see executeContentCheck's own doc comment.
   void executeContentCheck(check.id);
 
   return NextResponse.json({ id: check.id }, { status: 202 });

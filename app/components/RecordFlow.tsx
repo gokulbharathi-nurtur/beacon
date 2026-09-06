@@ -9,12 +9,7 @@ import { flattenToPaths } from '@/lib/diff/flatten';
 import { inferDefaultClassification, inferAllowEmpty } from '@/lib/diff/classify';
 import { sanitizeTemplateEvents } from '@/lib/diff/sanitizeTemplateEvents';
 import { extractApiErrorMessage } from '@/lib/apiError';
-import { getCategoryByValue } from '@/lib/eventCategories';
-import type { ClickableElement } from '@/lib/capture/discoverClickables';
-import type { FormTarget } from '@/lib/capture/drivers/form';
 import { StatusBadge } from './StatusBadge';
-import { ClickableElementPicker } from './ClickableElementPicker';
-import { FormPicker } from './FormPicker';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,17 +56,9 @@ interface EditableEvent {
 }
 
 const POLL_INTERVAL_MS = 1500;
-// Comfortably above the server-side DISCOVER_NAV_TIMEOUT_MS (10s in
-// app/api/discover-elements/route.ts) plus round-trip — this call also has to wait
-// behind any in-flight captures on the shared 2-slot queue, so it's the one fetch in
-// this component that gets an explicit client-side timeout.
-const DISCOVER_TIMEOUT_MS = 15_000;
 
-export function RecordFlow({ category }: { category: string }) {
+export function RecordFlow() {
   const router = useRouter();
-  const categorySlug = getCategoryByValue(category)!.slug;
-  const isClickCategory = category === 'click';
-  const isFormCategory = category === 'form';
   const searchParams = useSearchParams();
   const prefillUrl = searchParams.get('url') ?? '';
   const resumeRunId = searchParams.get('runId');
@@ -80,7 +67,7 @@ export function RecordFlow({ category }: { category: string }) {
   const existingTemplateId = searchParams.get('templateId');
   const prefillName = searchParams.get('name') ?? '';
 
-  const [step, setStep] = useState<'setup' | 'picking' | 'capturing' | 'review'>(resumeRunId ? 'capturing' : 'setup');
+  const [step, setStep] = useState<'setup' | 'capturing' | 'review'>(resumeRunId ? 'capturing' : 'setup');
   const [name, setName] = useState(prefillName);
   const [url, setUrl] = useState(prefillUrl);
   const [runId, setRunId] = useState<string | null>(resumeRunId);
@@ -89,15 +76,6 @@ export function RecordFlow({ category }: { category: string }) {
   const [error, setError] = useState<string | null>(null);
   const [startingCapture, setStartingCapture] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [discovering, setDiscovering] = useState(false);
-  const [clickElements, setClickElements] = useState<ClickableElement[]>([]);
-  const [selectedElement, setSelectedElement] = useState<ClickableElement | null>(null);
-  const [formTargets, setFormTargets] = useState<FormTarget[]>([]);
-  const [selectedForm, setSelectedForm] = useState<FormTarget | null>(null);
-  // Defaults closed — see the doc comment on FormTarget.allowSubmit in
-  // lib/capture/drivers/form.ts. Only a human ticking this box, right here, authorizes
-  // sending a real submission; nothing upstream can set it on the caller's behalf.
-  const [allowSubmit, setAllowSubmit] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -135,78 +113,7 @@ export function RecordFlow({ category }: { category: string }) {
 
   function handleSetupSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (isClickCategory) {
-      void discoverElements();
-    } else if (isFormCategory) {
-      void discoverForms();
-    } else {
-      void startCapture();
-    }
-  }
-
-  async function discoverElements() {
-    setError(null);
-    setDiscovering(true);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DISCOVER_TIMEOUT_MS);
-    try {
-      const res = await fetch('/api/discover-elements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-        signal: controller.signal,
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(extractApiErrorMessage(body, 'Failed to load the page.'));
-        return;
-      }
-      setClickElements(body.elements ?? []);
-      setSelectedElement(null);
-      setStep('picking');
-    } catch (err) {
-      setError(
-        err instanceof DOMException && err.name === 'AbortError'
-          ? 'Taking too long to load that page — try again.'
-          : 'Failed to load the page — is the server reachable?'
-      );
-    } finally {
-      clearTimeout(timeout);
-      setDiscovering(false);
-    }
-  }
-
-  async function discoverForms() {
-    setError(null);
-    setDiscovering(true);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DISCOVER_TIMEOUT_MS);
-    try {
-      const res = await fetch('/api/discover-forms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-        signal: controller.signal,
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(extractApiErrorMessage(body, 'Failed to load the page.'));
-        return;
-      }
-      setFormTargets(body.forms ?? []);
-      setSelectedForm(null);
-      setAllowSubmit(false);
-      setStep('picking');
-    } catch (err) {
-      setError(
-        err instanceof DOMException && err.name === 'AbortError'
-          ? 'Taking too long to load that page — try again.'
-          : 'Failed to load the page — is the server reachable?'
-      );
-    } finally {
-      clearTimeout(timeout);
-      setDiscovering(false);
-    }
+    void startCapture();
   }
 
   async function startCapture() {
@@ -216,12 +123,7 @@ export function RecordFlow({ category }: { category: string }) {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url,
-          mode: 'record',
-          ...(selectedElement ? { clickSelector: selectedElement.selector } : {}),
-          ...(selectedForm ? { formSelector: selectedForm.selector, formAllowSubmit: allowSubmit } : {}),
-        }),
+        body: JSON.stringify({ url, mode: 'record' }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -383,19 +285,7 @@ export function RecordFlow({ category }: { category: string }) {
         : await fetch('/api/templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: name.trim(),
-              sourceUrl: url,
-              category,
-              ...(selectedElement
-                ? {
-                    clickSelector: selectedElement.selector,
-                    clickLabel: selectedElement.label,
-                    ...(selectedElement.href ? { clickHref: selectedElement.href } : {}),
-                  }
-                : {}),
-              events: templateEvents,
-            }),
+            body: JSON.stringify({ name: name.trim(), sourceUrl: url, events: templateEvents }),
           });
       const body = await res.json();
       if (!res.ok) {
@@ -403,38 +293,21 @@ export function RecordFlow({ category }: { category: string }) {
         setSaving(false);
         return;
       }
-      router.push(`/${categorySlug}/templates/${existingTemplateId ?? body.id}`);
+      router.push(`/load-events/templates/${existingTemplateId ?? body.id}`);
     } catch {
       setError('Failed to save template — is the server reachable?');
       setSaving(false);
     }
   }
 
-  const usesDiscovery = isClickCategory || isFormCategory;
-  const setupBusy = usesDiscovery ? discovering : startingCapture;
-
   if (step === 'setup') {
     return (
       <div className="max-w-lg space-y-4">
         <h1 className="text-2xl font-semibold tracking-tight">Record a new template</h1>
         <p className="text-sm text-muted-foreground">
-          {isClickCategory ? (
-            <>
-              Enter the URL of a known-good (&quot;golden&quot;) page. We&apos;ll load it and list its clickable
-              elements so you can pick which one to test.
-            </>
-          ) : isFormCategory ? (
-            <>
-              Enter the URL of a known-good (&quot;golden&quot;) page. We&apos;ll load it and list its forms so you
-              can pick which one to fill and capture.
-            </>
-          ) : (
-            <>
-              Enter the URL of a known-good (&quot;golden&quot;) page. We&apos;ll capture whatever it pushes to{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">dataLayer</code> and let you review it before
-              saving.
-            </>
-          )}
+          Enter the URL of a known-good (&quot;golden&quot;) page. We&apos;ll capture whatever it pushes to{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">dataLayer</code> and let you review it before
+          saving.
         </p>
         <Card>
           <CardContent>
@@ -451,87 +324,14 @@ export function RecordFlow({ category }: { category: string }) {
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={setupBusy}>
-                {setupBusy && <Loader2 className="size-4 animate-spin" />}
-                {isClickCategory
-                  ? discovering
-                    ? 'Loading page…'
-                    : 'Find clickable elements'
-                  : isFormCategory
-                    ? discovering
-                      ? 'Loading page…'
-                      : 'Find forms'
-                    : startingCapture
-                      ? 'Starting…'
-                      : 'Capture'}
-                {!setupBusy && <ArrowRight className="size-4" />}
+              <Button type="submit" disabled={startingCapture}>
+                {startingCapture && <Loader2 className="size-4 animate-spin" />}
+                {startingCapture ? 'Starting…' : 'Capture'}
+                {!startingCapture && <ArrowRight className="size-4" />}
               </Button>
             </form>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  if (step === 'picking' && isFormCategory) {
-    return (
-      <div className="max-w-2xl space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Pick a form to fill</h1>
-        <p className="text-sm text-muted-foreground">
-          Found on <span className="break-all font-mono">{url}</span>. Pick the form you want to test — we&apos;ll
-          fill every field and capture whatever it pushes to{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">dataLayer</code>.
-        </p>
-        <FormPicker forms={formTargets} selectedSelector={selectedForm?.selector ?? null} onSelect={setSelectedForm} />
-        {selectedForm?.submitSelector && (
-          <label className="flex items-start gap-2 rounded-md bg-status-warning/10 px-3 py-2.5 text-sm ring-1 ring-status-warning/25">
-            <Checkbox checked={allowSubmit} onCheckedChange={(checked) => setAllowSubmit(checked === true)} className="mt-0.5" />
-            <span>
-              <span className="font-medium text-amber-700 dark:text-status-warning">
-                Also submit this form — sends a real request to the target site.
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                Only enable this for a site you control (e.g. staging). Leave it off to fill the form and capture
-                without submitting.
-              </span>
-            </span>
-          </label>
-        )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex items-center gap-3">
-          <Button type="button" onClick={startCapture} disabled={!selectedForm || startingCapture}>
-            {startingCapture && <Loader2 className="size-4 animate-spin" />}
-            {startingCapture ? 'Starting…' : 'Continue'}
-            {!startingCapture && <ArrowRight className="size-4" />}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => setStep('setup')} disabled={startingCapture}>
-            Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'picking') {
-    return (
-      <div className="max-w-2xl space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Pick what to click</h1>
-        <p className="text-sm text-muted-foreground">
-          Found on <span className="break-all font-mono">{url}</span>. Pick the element you want to test — we&apos;ll
-          click it and capture whatever it pushes to <code className="rounded bg-muted px-1 py-0.5 text-xs">dataLayer</code>.
-        </p>
-        <ClickableElementPicker elements={clickElements} selectedSelector={selectedElement?.selector ?? null} onSelect={setSelectedElement} />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex items-center gap-3">
-          <Button type="button" onClick={startCapture} disabled={!selectedElement || startingCapture}>
-            {startingCapture && <Loader2 className="size-4 animate-spin" />}
-            {startingCapture ? 'Starting…' : 'Continue'}
-            {!startingCapture && <ArrowRight className="size-4" />}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => setStep('setup')} disabled={startingCapture}>
-            Back
-          </Button>
-        </div>
       </div>
     );
   }
@@ -549,9 +349,7 @@ export function RecordFlow({ category }: { category: string }) {
         <Card>
           <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
             <Radio className="size-5 shrink-0 animate-pulse text-primary" />
-            {selectedElement
-              ? `Clicking "${selectedElement.label}" and waiting for dataLayer pushes to settle. This can take up to ~30 seconds.`
-              : 'Visiting the page and waiting for dataLayer pushes to settle. This can take up to ~30 seconds.'}
+            Visiting the page and waiting for dataLayer pushes to settle. This can take up to ~30 seconds.
           </CardContent>
         </Card>
         {error && (
@@ -568,11 +366,6 @@ export function RecordFlow({ category }: { category: string }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Review capture</h1>
-        {selectedElement && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Captured after clicking <strong className="text-foreground">{selectedElement.label}</strong>.
-          </p>
-        )}
         <p className="mt-1 text-sm text-muted-foreground">
           Captured {events.length} event{events.length === 1 ? '' : 's'} from <span className="break-all font-mono">{url}</span>.
           Each field defaults to <strong className="text-foreground">exact</strong> (must match precisely, e.g. an enum like{' '}

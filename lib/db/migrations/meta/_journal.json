@@ -57,6 +57,13 @@
       "when": 1787648867873,
       "tag": "0007_foamy_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788667720581,
+      "tag": "0008_reflective_wonder_man",
+      "breakpoints": true
     }
   ]
 }

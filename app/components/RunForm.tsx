@@ -12,13 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export function RunForm({
-  templates,
-  categorySlug,
-}: {
-  templates: Pick<TemplateRow, 'id' | 'name' | 'sourceUrl'>[];
-  categorySlug: string;
-}) {
+export function RunForm({ templates }: { templates: Pick<TemplateRow, 'id' | 'name' | 'sourceUrl'>[] }) {
   const router = useRouter();
   const [url, setUrl] = useState('');
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? '');
@@ -73,7 +67,7 @@ export function RunForm({
             {templates.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No templates saved yet.{' '}
-                <Link href={`/${categorySlug}/templates/new`} className="text-primary underline underline-offset-2">
+                <Link href="/load-events/templates/new" className="text-primary underline underline-offset-2">
                   Record one first
                 </Link>
                 .
@@ -105,11 +99,7 @@ export function RunForm({
               {!submitting && <ArrowRight className="size-4" />}
             </Button>
             <Link
-              href={
-                url
-                  ? `/${categorySlug}/templates/new?url=${encodeURIComponent(url)}`
-                  : `/${categorySlug}/templates/new`
-              }
+              href={url ? `/load-events/templates/new?url=${encodeURIComponent(url)}` : '/load-events/templates/new'}
               className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
               Record new template instead

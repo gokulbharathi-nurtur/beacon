@@ -64,10 +64,8 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const MIN_SLUG_WORD_COUNT = 4;
 
 /**
- * Deliberately more conservative than classifyPages' looksLikeIdentifier
- * (lib/sweep/classifyPages.ts), which this started as a copy of. A false positive there
- * just merges two page types into one sweep bucket — low stakes. A false positive here
- * silently turns an authored content-map row into an unintended catch-all that steals
+ * Deliberately conservative: a false positive here silently turns an authored content-map
+ * row into an unintended catch-all that steals
  * matches from a later, more specific row (e.g. "/our-services/land-and-new-homes/" is a
  * real static route — 4 hyphenated words, "land"/"and"/"new"/"homes" — that used to
  * collapse to "/our-services/*" and swallow every other /our-services/ row below it in the

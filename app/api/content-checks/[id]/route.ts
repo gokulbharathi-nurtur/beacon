@@ -10,8 +10,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Content check not found' }, { status: 404 });
   }
 
-  // Results accumulate as the check runs (see executeContentCheck's incremental inserts),
-  // same live-poll shape as /api/sweeps/[id].
+  // Results accumulate as the check runs (see executeContentCheck's incremental inserts);
+  // the detail page polls this endpoint until the check completes.
   const results = await db.select().from(contentCheckResults).where(eq(contentCheckResults.contentCheckId, id));
 
   return NextResponse.json({ check, results });
