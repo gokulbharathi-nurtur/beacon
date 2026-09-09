@@ -142,8 +142,20 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
 
   async function deleteTemplate() {
     setBusy(true);
-    await fetch(`/api/templates/${template.id}`, { method: 'DELETE' });
-    router.push('/load-events/templates');
+    setError(null);
+    try {
+      const res = await fetch(`/api/templates/${template.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(extractApiErrorMessage(body, 'Failed to delete template.'));
+        setBusy(false);
+        return;
+      }
+      router.push('/load-events/templates');
+    } catch {
+      setError('Failed to delete template — is the server reachable?');
+      setBusy(false);
+    }
   }
 
   async function reRecord() {

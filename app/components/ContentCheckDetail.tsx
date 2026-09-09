@@ -94,7 +94,7 @@ export function ContentCheckDetail({ contentCheckId }: { contentCheckId: string 
       )}
 
       {check.status === 'error' && (
-        <div className="rounded-md bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
+        <div className="rounded-sm bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
           <p className="flex items-center gap-1.5 font-medium">
             <CircleAlert className="size-4" />
             Content check failed

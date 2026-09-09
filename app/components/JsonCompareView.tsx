@@ -42,7 +42,7 @@ export function JsonCompareView({ diff }: { diff: DiffResult }) {
       })}
 
       {clean.length > 0 && (
-        <details className="group rounded-lg ring-1 ring-border">
+        <details className="group rounded-sm ring-1 ring-border">
           <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold">
             <CircleCheck className="size-4 text-status-good" />
             Clean events ({clean.length})
@@ -90,7 +90,7 @@ function EventCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`overflow-hidden rounded-lg ring-1 ${TONE_RING[tone]}`}>
+    <div className={`overflow-hidden rounded-sm ring-1 ${TONE_RING[tone]}`}>
       <div className={`px-4 py-1.5 font-mono text-sm ${TONE_HEADER[tone]}`}>
         {eventName} <span className="text-xs text-muted-foreground">occurrence #{occurrenceIndex}</span>
       </div>
@@ -104,9 +104,9 @@ function Panel({ label, children, note }: { label: string; children?: React.Reac
     <div className="min-w-0 p-3">
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
       {children ? (
-        <div className="max-h-96 overflow-auto rounded-md bg-muted/40 py-1.5">{children}</div>
+        <div className="max-h-96 overflow-auto rounded-sm bg-muted/40 py-1.5">{children}</div>
       ) : (
-        <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground italic">{note}</p>
+        <p className="rounded-sm bg-muted/40 p-2 text-xs text-muted-foreground italic">{note}</p>
       )}
     </div>
   );

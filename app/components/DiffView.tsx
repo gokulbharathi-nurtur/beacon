@@ -24,7 +24,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
             {diff.missingEvents.map((m, i) => (
               <li
                 key={i}
-                className="flex items-center gap-2 rounded-md bg-status-critical/5 px-3 py-2 text-sm ring-1 ring-status-critical/15"
+                className="flex items-center gap-2 rounded-sm bg-status-critical/5 px-3 py-2 text-sm ring-1 ring-status-critical/15"
               >
                 <span className="font-mono">{m.eventName}</span>
                 <span className="text-xs text-muted-foreground">occurrence #{m.occurrenceIndex}</span>
@@ -42,7 +42,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
         >
           <div className="space-y-2">
             {diff.unexpectedEvents.map((u, i) => (
-              <details key={i} className="rounded-md bg-status-info/5 px-3 py-2 text-sm ring-1 ring-status-info/15">
+              <details key={i} className="rounded-sm bg-status-info/5 px-3 py-2 text-sm ring-1 ring-status-info/15">
                 <summary className="cursor-pointer font-mono">
                   {u.eventName} <span className="text-xs text-muted-foreground">occurrence #{u.occurrenceIndex}</span>
                 </summary>
@@ -61,7 +61,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
         >
           <ul className="space-y-1">
             {diff.countMismatches.map((c, i) => (
-              <li key={i} className="rounded-md bg-status-warning/10 px-3 py-2 text-sm ring-1 ring-status-warning/20">
+              <li key={i} className="rounded-sm bg-status-warning/10 px-3 py-2 text-sm ring-1 ring-status-warning/20">
                 <span className="font-mono">{c.eventName}</span>: expected {c.expectedCount}, got {c.actualCount}
               </li>
             ))}
@@ -81,7 +81,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
               .map((m, i) => {
                 const { topLevel, itemLevel } = splitFieldDiffs(m.fieldDiffs);
                 return (
-                  <div key={i} className="overflow-hidden rounded-lg ring-1 ring-status-serious/25">
+                  <div key={i} className="overflow-hidden rounded-sm ring-1 ring-status-serious/25">
                     <div className="bg-status-serious/10 px-3 py-1.5 font-mono text-sm">
                       {m.eventName} <span className="text-xs text-muted-foreground">occurrence #{m.occurrenceIndex}</span>
                     </div>
@@ -102,7 +102,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
       )}
 
       {diff.matchedEvents.some((m) => m.status === 'clean') && (
-        <details className="group rounded-lg ring-1 ring-border">
+        <details className="group rounded-sm ring-1 ring-border">
           <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold">
             <CircleCheck className="size-4 text-status-good" />
             Clean events ({summary.cleanCount})

@@ -52,7 +52,7 @@ export function ContentCheckResultsView({ results }: { results: ContentCheckResu
       )}
 
       {pass.length > 0 && (
-        <details className="group rounded-lg ring-1 ring-border">
+        <details className="group rounded-sm ring-1 ring-border">
           <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold">
             <CircleCheck className="size-4 text-status-good" />
             Pass ({pass.length})
@@ -68,7 +68,7 @@ export function ContentCheckResultsView({ results }: { results: ContentCheckResu
 
 function FailCard({ result }: { result: ContentCheckResultRow }) {
   return (
-    <div className="overflow-hidden rounded-lg ring-1 ring-status-critical/25">
+    <div className="overflow-hidden rounded-sm ring-1 ring-status-critical/25">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-status-critical/10 px-3 py-1.5 text-sm">
         {result.matchedPattern && <span className="font-mono text-xs text-muted-foreground">{result.matchedPattern}</span>}
         <a
@@ -87,7 +87,7 @@ function FailCard({ result }: { result: ContentCheckResultRow }) {
 
 function PageList({ results, showPattern }: { results: ContentCheckResultRow[]; showPattern?: boolean }) {
   return (
-    <ul className="divide-y divide-border rounded-lg ring-1 ring-border">
+    <ul className="divide-y divide-border rounded-sm ring-1 ring-border">
       {results.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm">
           {showPattern && r.matchedPattern && (

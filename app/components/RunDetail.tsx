@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CircleAlert, Loader2, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, CircleAlert, Loader2, ArrowRight, RotateCw } from 'lucide-react';
 import type { DiffResult, RawEvent, TemplateDefinition } from '@/lib/types';
 import type { RunRow } from '@/lib/db/schema';
 import { unmarkForDisplay } from '@/lib/capture/undefinedMarker';
@@ -22,9 +23,33 @@ interface RunResponse {
 const POLL_INTERVAL_MS = 1500;
 
 export function RunDetail({ runId }: { runId: string }) {
+  const router = useRouter();
   const [data, setData] = useState<RunResponse | null>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function handleRerun() {
+    if (!data?.run) return;
+    setRerunning(true);
+    try {
+      const res = await fetch('/api/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: data.run.targetUrl,
+          mode: data.run.mode,
+          ...(data.run.mode === 'diff' && data.run.templateId ? { templateId: data.run.templateId } : {}),
+        }),
+      });
+      const body = await res.json();
+      if (res.ok) {
+        router.push(`/runs/${body.id}`);
+      }
+    } catch {
+      setRerunning(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -67,9 +92,23 @@ export function RunDetail({ runId }: { runId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <div className="mb-1.5 flex items-center gap-2">
-          <StatusBadge status={run.status} />
-          <span className="text-xs text-muted-foreground">{run.mode} run</span>
+        <div className="mb-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <StatusBadge status={run.status} />
+            <span className="text-xs text-muted-foreground">{run.mode} run</span>
+          </div>
+          {run.status === 'complete' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRerun}
+              disabled={rerunning}
+            >
+              {rerunning ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCw className="size-3.5" />}
+              Rerun
+            </Button>
+          )}
         </div>
         <h1 className="break-all text-xl font-semibold tracking-tight">{run.targetUrl}</h1>
       </div>
@@ -84,7 +123,7 @@ export function RunDetail({ runId }: { runId: string }) {
       )}
 
       {run.status === 'error' && (
-        <div className="rounded-md bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
+        <div className="rounded-sm bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
           <p className="flex items-center gap-1.5 font-medium">
             <CircleAlert className="size-4" />
             Run failed
@@ -126,7 +165,7 @@ export function RunDetail({ runId }: { runId: string }) {
             <div className="mt-3 space-y-3">
               <div>
                 <p className="mb-1 text-xs font-medium text-muted-foreground">Events ({run.capturedEvents?.length ?? 0})</p>
-                <pre className="max-h-96 overflow-auto rounded-md bg-muted/40 p-3 text-xs">
+                <pre className="max-h-96 overflow-auto rounded-sm bg-muted/40 p-3 text-xs">
                   {JSON.stringify(run.capturedEvents, null, 2)}
                 </pre>
               </div>
@@ -134,7 +173,7 @@ export function RunDetail({ runId }: { runId: string }) {
                 <p className="mb-1 text-xs font-medium text-muted-foreground">
                   Non-event pushes filtered ({run.nonEventPushCount ?? 0}) — e.g. the null-clear pattern
                 </p>
-                <pre className="max-h-48 overflow-auto rounded-md bg-muted/40 p-3 text-xs">{JSON.stringify(run.nonEventPushes, null, 2)}</pre>
+                <pre className="max-h-48 overflow-auto rounded-sm bg-muted/40 p-3 text-xs">{JSON.stringify(run.nonEventPushes, null, 2)}</pre>
               </div>
             </div>
           )}

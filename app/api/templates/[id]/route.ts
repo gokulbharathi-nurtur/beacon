@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { templates } from '@/lib/db/schema';
+import { runs, templates } from '@/lib/db/schema';
 import { updateTemplateSchema } from '@/lib/validation';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +35,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await db.delete(templates).where(eq(templates.id, id));
+  // Past diff runs reference this template via runs.template_id (a foreign key
+  // better-sqlite3 enforces by default). Unlink them rather than delete them so their
+  // capture history survives — the delete confirmation dialog promises exactly this. Both
+  // writes go in one transaction so a template is never left half-deleted.
+  db.transaction((tx) => {
+    tx.update(runs).set({ templateId: null }).where(eq(runs.templateId, id)).run();
+    tx.delete(templates).where(eq(templates.id, id)).run();
+  });
   return NextResponse.json({ ok: true });
 }

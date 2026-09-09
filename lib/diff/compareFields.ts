@@ -52,7 +52,10 @@ export function compareFieldsAgainstObject(
     }
 
     const allowedTypes = rule.anyOfTypes ?? [rule.type];
-    if (!allowedTypes.includes(leaf.type)) {
+    // When a structural field is marked allowEmpty, undefined is also an allowed type
+    if (rule.classification === 'structural' && (rule.allowEmpty ?? false) && leaf.type === 'undefined') {
+      // undefined is allowed when allowEmpty is true; continue to the structural validity check
+    } else if (!allowedTypes.includes(leaf.type)) {
       diffs.push({
         path: rule.path,
         kind: 'type_mismatch',

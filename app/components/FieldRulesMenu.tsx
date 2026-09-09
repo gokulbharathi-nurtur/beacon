@@ -188,9 +188,9 @@ export function FieldRulesMenu({
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1 pl-2 text-xs text-muted-foreground">
+    <span className="inline-flex items-center gap-1 rounded-sm bg-muted py-0.5 pr-1 pl-2 text-xs text-muted-foreground">
       {label}
-      <button type="button" onClick={onRemove} className="rounded-full p-0.5 hover:text-foreground">
+      <button type="button" onClick={onRemove} className="rounded-sm p-0.5 hover:text-foreground">
         <X className="size-3" />
       </button>
     </span>
@@ -211,13 +211,13 @@ function ChipWithInput({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1 pl-2 text-xs text-muted-foreground',
+        'inline-flex items-center gap-1 rounded-sm bg-muted py-0.5 pr-1 pl-2 text-xs text-muted-foreground',
         invalid && 'ring-1 ring-status-critical'
       )}
     >
       {prefix}
       {input}
-      <button type="button" onClick={onRemove} className="rounded-full p-0.5 hover:text-foreground">
+      <button type="button" onClick={onRemove} className="rounded-sm p-0.5 hover:text-foreground">
         <X className="size-3" />
       </button>
     </span>

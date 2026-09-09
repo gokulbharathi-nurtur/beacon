@@ -47,7 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="border-b border-border">
           <div className="mx-auto flex max-w-360 items-center gap-6 px-4 py-3">
             <Link href="/" className="flex items-center gap-2">
-              <BeaconMark className="size-7 rounded-md" />
+              <BeaconMark className="size-7 rounded-sm" />
               <span className="flex items-baseline gap-1.5">
                 <span className="font-semibold tracking-tight">Beacon</span>
               </span>

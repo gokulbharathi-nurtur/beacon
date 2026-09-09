@@ -175,6 +175,13 @@ export function RecordFlow() {
     );
   }
 
+  /** Header checkbox: flip every top-level field in one event to included/excluded at once. */
+  function setAllFieldsIncluded(eventIdx: number, included: boolean) {
+    setEvents((prev) =>
+      prev.map((ev, i) => (i !== eventIdx ? ev : { ...ev, fields: ev.fields.map((f) => ({ ...f, included })) }))
+    );
+  }
+
   function toggleItemFieldIncluded(eventIdx: number, fieldIdx: number, itemFieldIdx: number) {
     setEvents((prev) =>
       prev.map((ev, i) =>
@@ -353,7 +360,7 @@ export function RecordFlow() {
           </CardContent>
         </Card>
         {error && (
-          <div className="rounded-md bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
+          <div className="rounded-sm bg-status-critical/10 px-4 py-3 text-sm text-status-critical ring-1 ring-status-critical/20">
             {error}
           </div>
         )}
@@ -394,7 +401,9 @@ export function RecordFlow() {
       </div>
 
       <div className="space-y-4">
-        {events.map((ev, eventIdx) => (
+        {events.map((ev, eventIdx) => {
+          const allIncluded = ev.fields.length > 0 && ev.fields.every((f) => f.included);
+          return (
           <Card key={`${ev.eventName}-${ev.occurrenceIndex}`} className="gap-0 p-0">
             <div className="border-b border-border bg-muted/50 px-4 py-2 font-mono text-sm">
               {ev.eventName} <span className="text-xs text-muted-foreground">occurrence #{ev.occurrenceIndex}</span>
@@ -402,7 +411,16 @@ export function RecordFlow() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Include?</TableHead>
+                  <TableHead>
+                    <label className="flex items-center gap-1.5 font-normal">
+                      <Checkbox
+                        checked={allIncluded}
+                        onCheckedChange={(checked) => setAllFieldsIncluded(eventIdx, checked === true)}
+                        aria-label={`Include all ${ev.eventName} fields in the saved template`}
+                      />
+                      Include?
+                    </label>
+                  </TableHead>
                   <TableHead>Field</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Captured value</TableHead>
@@ -521,7 +539,8 @@ export function RecordFlow() {
               </TableBody>
             </Table>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

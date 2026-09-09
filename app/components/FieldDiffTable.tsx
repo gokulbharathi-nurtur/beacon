@@ -85,7 +85,7 @@ const TONE_TEXT: Record<string, string> = {
 
 export function StatTile({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="rounded-xl bg-card px-3.5 py-3 ring-1 ring-foreground/10">
+    <div className="rounded-sm bg-card px-3.5 py-3 ring-1 ring-foreground/10">
       <div className={`text-2xl font-semibold ${TONE_TEXT[tone]}`}>{value}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
     </div>
