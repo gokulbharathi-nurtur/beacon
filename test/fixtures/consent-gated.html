@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — consent-gated event</title></head>
+<body>
+<h1>Home</h1>
+
+<!-- Stand-in for a OneTrust banner: a real "accept all" control with the id the capture
+     engine looks for. -->
+<div id="onetrust-banner-sdk" role="dialog">
+  <button id="onetrust-accept-btn-handler">Accept all</button>
+</div>
+
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  // Consent-gated: only pushed once the visitor accepts cookies, like a GA4 list-view
+  // event behind marketing consent.
+  document.getElementById('onetrust-accept-btn-handler').addEventListener('click', function () {
+    document.getElementById('onetrust-banner-sdk').remove();
+    window.dataLayer.push({ event: 'consented_view', item_count: 4 });
+  });
+</script>
+</body>
+</html>

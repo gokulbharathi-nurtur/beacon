@@ -3,6 +3,51 @@
 export type LeafType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'undefined';
 export type FieldClassification = 'exact' | 'structural';
 
+/**
+ * What triggers the events a template/run is about. `pageload` is the original behaviour —
+ * capture whatever fires on navigation. `click` performs an ordered list of interaction
+ * steps after the page loads and captures what those trigger. The enum is left open for
+ * future kinds (scroll, fill, …) — adding one needs no migration.
+ */
+export type TemplateKind = 'pageload' | 'click';
+
+/** One interaction the capture engine performs after the page has loaded. v1: click only. */
+export interface InteractionStep {
+  action: 'click';
+  target: {
+    /** `text` matches the control's visible label via a role/text locator; `css` is a raw selector. */
+    by: 'text' | 'css';
+    value: string;
+  };
+  /** Optional human note shown in the UI, e.g. "Open the viewing form". */
+  label?: string;
+}
+
+/** Outcome of one InteractionStep during a capture — surfaced on the run, never fatal. */
+export interface StepResult {
+  index: number;
+  target: InteractionStep['target'];
+  label?: string;
+  /**
+   * Why a step didn't run, when it didn't. `target_disabled` and `click_blocked` are
+   * split out from the generic `target_not_found` because they're the common real-world
+   * cases and each points at a different fix: a disabled control usually means the step
+   * order is wrong (a carousel's "previous" arrow is disabled until you've gone forward),
+   * while a blocked click usually means an overlay — very often a consent banner that
+   * only appeared once the page was first interacted with — is sitting on top of it.
+   */
+  status: 'ok' | 'target_not_found' | 'target_disabled' | 'click_blocked' | 'error';
+  message?: string;
+  /**
+   * Epoch ms when this step's click was *initiated* (not when it resolved — a resolved
+   * click and the exposeBinding delivery for the push it triggered race over separate
+   * async channels, so "resolved" isn't a safe ordering boundary). Only set when status
+   * is 'ok'. Every push from this moment until the next step's click starts is
+   * attributed to this step.
+   */
+  firedAt?: number;
+}
+
 /** A single push captured off window.dataLayer. Only pushes shaped like { event: string, ... } are events. */
 export interface RawEvent {
   event: string;
@@ -21,6 +66,14 @@ export interface CaptureResult {
   filteredPushCount: number;
   /** True if the hard ceiling fired instead of a natural quiet-period settle. */
   timedOut: boolean;
+  /** Present only when interaction steps ran — one entry per step attempted, in order. */
+  stepResults?: StepResult[];
+  /**
+   * Present only when interaction steps ran — parallel to `events`: `eventStepIndex[i]`
+   * is the `StepResult.index` of the step that (most likely) triggered `events[i]`, or
+   * `null` if it arrived before any step fired (i.e. during the initial page load).
+   */
+  eventStepIndex?: (number | null)[];
 }
 
 export interface TemplateFieldRule {
@@ -55,6 +108,18 @@ export interface TemplateFieldRule {
    * false (must be non-empty) when absent.
    */
   allowEmpty?: boolean;
+  /**
+   * Only meaningful when classification === 'structural' — when true, the field is allowed
+   * to be `undefined`. Defaults to false when absent. Use this when a field is sometimes
+   * absent/undefined but sometimes present.
+   */
+  allowUndefined?: boolean;
+  /**
+   * Only meaningful when classification === 'structural' — when true, the field is allowed
+   * to be `null`. Defaults to false when absent. Use this when a field is sometimes null
+   * but sometimes has a real value.
+   */
+  allowNull?: boolean;
   /**
    * Only meaningful when type === 'array'. Optional — when set, the array must have
    * exactly this many items (e.g. a fixed "featured properties" carousel that always
@@ -107,6 +172,12 @@ export interface TemplateEvent {
   eventName: string;
   /** 0-based — which instance of this event name in the recording. */
   occurrenceIndex: number;
+  /**
+   * When true, a captured run that doesn't contain this event is not reported as a
+   * `missing` event, and the shortfall doesn't count toward this name's count mismatch.
+   * Every other check still applies when the event *is* present.
+   */
+  optional?: boolean;
   fields: TemplateFieldRule[];
 }
 

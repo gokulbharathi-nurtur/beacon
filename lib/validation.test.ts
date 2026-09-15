@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fieldRuleSchema } from './validation';
+import { fieldRuleSchema, createTemplateSchema, createRunSchema } from './validation';
 
 describe('fieldRuleSchema', () => {
   it('accepts a valid matchesPattern/excludesPattern regex', () => {
@@ -96,5 +96,48 @@ describe('fieldRuleSchema', () => {
       ],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('createTemplateSchema kind/steps pairing', () => {
+  const base = { name: 'T', sourceUrl: 'https://x.test/', events: [] };
+
+  it('defaults kind to pageload and accepts no steps', () => {
+    const result = createTemplateSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.kind).toBe('pageload');
+  });
+
+  it('rejects a click template with no steps', () => {
+    const result = createTemplateSchema.safeParse({ ...base, kind: 'click' });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.some((i) => i.path.includes('steps'))).toBe(true);
+  });
+
+  it('rejects a pageload template that carries steps', () => {
+    const result = createTemplateSchema.safeParse({
+      ...base,
+      kind: 'pageload',
+      steps: [{ action: 'click', target: { by: 'text', value: 'Go' } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a click template with at least one step', () => {
+    const result = createTemplateSchema.safeParse({
+      ...base,
+      kind: 'click',
+      steps: [{ action: 'click', target: { by: 'text', value: 'Book a viewing' }, label: 'Open form' }],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('createRunSchema', () => {
+  it('only enforces kind/steps pairing for record runs', () => {
+    // diff runs derive kind/steps server-side, so a bare diff body is fine
+    expect(createRunSchema.safeParse({ url: 'https://x.test/', mode: 'diff', templateIds: ['a'] }).success).toBe(true);
+    // a record run declaring click must carry steps
+    expect(createRunSchema.safeParse({ url: 'https://x.test/', mode: 'record', kind: 'click' }).success).toBe(false);
   });
 });

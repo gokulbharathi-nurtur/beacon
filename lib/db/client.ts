@@ -4,6 +4,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import path from 'node:path';
 import fs from 'node:fs';
 import * as schema from './schema';
+import { backfillProjects } from './backfill';
 
 const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), 'data');
 const DB_PATH = process.env.DB_PATH ?? path.join(DATA_DIR, 'datalayer-qa.sqlite');
@@ -29,5 +30,6 @@ export { sqlite };
 
 if (!globalThis.__datalayerQaMigrated) {
   migrate(db, { migrationsFolder: path.join(process.cwd(), 'lib/db/migrations') });
+  backfillProjects(sqlite);
   globalThis.__datalayerQaMigrated = true;
 }

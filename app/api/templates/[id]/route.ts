@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { runs, templates } from '@/lib/db/schema';
+import { projects, runs, templates } from '@/lib/db/schema';
 import { updateTemplateSchema } from '@/lib/validation';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,6 +19,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = updateTemplateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  if (parsed.data.projectId) {
+    const [project] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, parsed.data.projectId));
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
   }
 
   const [updated] = await db

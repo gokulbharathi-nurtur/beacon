@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export function ContentMapUpload() {
+export function ContentMapUpload({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -29,6 +29,7 @@ export function ContentMapUpload() {
     try {
       const formData = new FormData();
       formData.set('file', file);
+      formData.set('projectId', projectId);
       if (name.trim()) formData.set('name', name.trim());
 
       const res = await fetch('/api/content-maps', { method: 'POST', body: formData });

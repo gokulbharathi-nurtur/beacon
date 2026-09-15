@@ -24,7 +24,7 @@ export async function executeRun(runId: string): Promise<void> {
     context = await browser.newContext();
     const page = await context.newPage();
 
-    const result = await runCapture(page, run.targetUrl);
+    const result = await runCapture(page, run.targetUrl, run.steps?.length ? { steps: run.steps } : {});
     const { nonEvents } = partitionPushes(result.rawPushes);
 
     await db
@@ -35,6 +35,9 @@ export async function executeRun(runId: string): Promise<void> {
         rawPushCount: result.rawPushes.length,
         nonEventPushCount: result.filteredPushCount,
         nonEventPushes: nonEvents,
+        timedOut: result.timedOut,
+        stepResults: result.stepResults ?? null,
+        eventStepIndex: result.eventStepIndex ?? null,
         finishedAt: new Date(),
       })
       .where(eq(runs.id, runId));

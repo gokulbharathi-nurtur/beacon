@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
   const [check] = await db
     .insert(contentChecks)
     .values({
+      projectId: parsed.data.projectId,
       contentMapId: parsed.data.contentMapId,
       baseUrl: parsed.data.baseUrl,
       mode: parsed.data.mode,
@@ -44,7 +45,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ id: check.id }, { status: 202 });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const projectId = request.nextUrl.searchParams.get('projectId');
   const recent = await db
     .select({
       id: contentChecks.id,
@@ -57,6 +59,7 @@ export async function GET() {
     })
     .from(contentChecks)
     .leftJoin(contentMaps, eq(contentMaps.id, contentChecks.contentMapId))
+    .where(projectId ? eq(contentChecks.projectId, projectId) : undefined)
     .orderBy(desc(contentChecks.createdAt))
     .limit(50);
 

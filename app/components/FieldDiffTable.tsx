@@ -32,7 +32,8 @@ const KIND_STYLES: Record<FieldDiff['kind'], string> = {
 };
 
 export function fmt(value: unknown): string {
-  if (value === undefined) return '—';
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
   if (typeof value === 'string') return value === '' ? '(empty string)' : value;
   return JSON.stringify(value);
 }

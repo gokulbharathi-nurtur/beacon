@@ -64,6 +64,48 @@
       "when": 1788667720581,
       "tag": "0008_reflective_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788952345317,
+      "tag": "0009_happy_malcolm_colcord",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788957845889,
+      "tag": "0010_abandoned_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789017216549,
+      "tag": "0011_modern_sprite",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789020342414,
+      "tag": "0012_big_punisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789029766433,
+      "tag": "0013_breezy_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1789391392551,
+      "tag": "0014_even_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

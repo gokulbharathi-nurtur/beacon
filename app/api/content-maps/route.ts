@@ -12,8 +12,13 @@ export async function POST(request: NextRequest) {
 
   const file = formData.get('file');
   const rawName = formData.get('name');
+  const rawProjectId = formData.get('projectId');
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'A "file" field (.csv or .xlsx) is required.' }, { status: 400 });
+  }
+  const projectId = typeof rawProjectId === 'string' && rawProjectId.trim() ? rawProjectId.trim() : null;
+  if (!projectId) {
+    return NextResponse.json({ error: 'A "projectId" field is required.' }, { status: 400 });
   }
   const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : file.name;
 
@@ -35,7 +40,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const [map] = await db.insert(contentMaps).values({ name, sourceFilename: file.name }).returning();
+  const [map] = await db.insert(contentMaps).values({ projectId, name, sourceFilename: file.name }).returning();
   await db.insert(contentMapRules).values(
     rows.map((row, i) => ({
       contentMapId: map.id,
@@ -51,7 +56,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ id: map.id, ruleCount: rows.length }, { status: 201 });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const projectId = request.nextUrl.searchParams.get('projectId');
   const maps = await db
     .select({
       id: contentMaps.id,
@@ -62,6 +68,7 @@ export async function GET() {
     })
     .from(contentMaps)
     .leftJoin(contentMapRules, eq(contentMapRules.contentMapId, contentMaps.id))
+    .where(projectId ? eq(contentMaps.projectId, projectId) : undefined)
     .groupBy(contentMaps.id)
     .orderBy(desc(contentMaps.createdAt));
 

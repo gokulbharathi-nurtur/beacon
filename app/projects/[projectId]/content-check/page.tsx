@@ -11,7 +11,9 @@ import { relativeTime } from '@/lib/relativeTime';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ContentCheckPage() {
+export default async function ContentCheckPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const { projectId } = await params;
+
   const maps = await db
     .select({
       id: contentMaps.id,
@@ -21,6 +23,7 @@ export default async function ContentCheckPage() {
     })
     .from(contentMaps)
     .leftJoin(contentMapRules, eq(contentMapRules.contentMapId, contentMaps.id))
+    .where(eq(contentMaps.projectId, projectId))
     .groupBy(contentMaps.id)
     .orderBy(desc(contentMaps.createdAt));
 
@@ -36,13 +39,14 @@ export default async function ContentCheckPage() {
     })
     .from(contentChecks)
     .leftJoin(contentMaps, eq(contentMaps.id, contentChecks.contentMapId))
+    .where(eq(contentChecks.projectId, projectId))
     .orderBy(desc(contentChecks.createdAt))
     .limit(20);
 
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Content check</h1>
+        <h2 className="text-xl font-semibold tracking-tight">Content check</h2>
         <p className="mt-1 mb-5 max-w-2xl text-sm text-muted-foreground">
           Checks the <code className="font-mono">page</code> object a page_loaded event carries — its
           content_group/content_id/content_type — against a reference table you upload, mapping URL patterns to
@@ -51,8 +55,8 @@ export default async function ContentCheckPage() {
         </p>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <ContentMapUpload />
-          <ContentCheckForm maps={maps.map((m) => ({ id: m.id, name: m.name }))} />
+          <ContentMapUpload projectId={projectId} />
+          <ContentCheckForm projectId={projectId} maps={maps.map((m) => ({ id: m.id, name: m.name }))} />
         </div>
       </div>
 
@@ -92,7 +96,7 @@ export default async function ContentCheckPage() {
               {recentChecks.map((check) => (
                 <li key={check.id}>
                   <Link
-                    href={`/load-events/content-check/${check.id}`}
+                    href={`/projects/${projectId}/content-check/${check.id}`}
                     className="group flex items-center justify-between gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/60"
                   >
                     <div className="min-w-0 flex-1">

@@ -2,10 +2,12 @@
 
 import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Play, RefreshCw, Trash2, Save, ChevronRight } from 'lucide-react';
+import { Loader2, Play, RefreshCw, Trash2, Save, ChevronRight, MousePointerClick } from 'lucide-react';
 import type { TemplateRow } from '@/lib/db/schema';
-import type { TemplateEvent, TemplateFieldRule } from '@/lib/types';
+import type { InteractionStep, TemplateEvent, TemplateFieldRule } from '@/lib/types';
 import { sanitizeTemplateEvents } from '@/lib/diff/sanitizeTemplateEvents';
+import { StepsEditor, cleanSteps } from './StepsEditor';
+import { ClickableScanner } from './ClickableScanner';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 import { FieldRulesMenu } from './FieldRulesMenu';
+import { Combobox } from '@/components/ui/combobox';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
@@ -26,15 +30,67 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-export function TemplateEditor({ template }: { template: TemplateRow }) {
+const UNASSIGNED = '__unassigned__';
+
+export function TemplateEditor({
+  template,
+  projects,
+  backProjectId,
+}: {
+  template: TemplateRow;
+  projects: { id: string; name: string }[];
+  /** The project whose route this editor was opened under, for the "back to templates"
+   * target. Falls back to the template's own project, then the global list. */
+  backProjectId?: string;
+}) {
   const router = useRouter();
   const [name, setName] = useState(template.name);
   const [events, setEvents] = useState<TemplateEvent[]>(template.events);
+  const [steps, setSteps] = useState<InteractionStep[]>(template.steps ?? []);
+  const [projectId, setProjectId] = useState<string | null>(template.projectId);
   const [dirty, setDirty] = useState(false);
+  const isClick = template.kind === 'click';
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedItemFields, setExpandedItemFields] = useState<Set<string>>(new Set());
+  // Expanded event cards, keyed by `${eventName}-${occurrenceIndex}`. Starts all collapsed.
+  const [openEvents, setOpenEvents] = useState<Set<string>>(new Set());
+
+  function toggleEventOpen(key: string) {
+    setOpenEvents((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function setAllEventsOpen(open: boolean) {
+    setOpenEvents(open ? new Set(events.map((ev) => `${ev.eventName}-${ev.occurrenceIndex}`)) : new Set());
+  }
+
+  // Return to wherever the editor was opened from: a project's template tab keeps you in
+  // that project; the global list sends you back there — regardless of the template's
+  // own project.
+  const listHref = backProjectId ? `/projects/${backProjectId}/templates` : '/templates';
+
+  async function changeProject(next: string | null) {
+    const prev = projectId;
+    setProjectId(next);
+    setError(null);
+    const res = await fetch(`/api/templates/${template.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: next }),
+    });
+    if (!res.ok) {
+      setProjectId(prev);
+      const body = await res.json().catch(() => null);
+      setError(extractApiErrorMessage(body, 'Failed to change project.'));
+      return;
+    }
+    router.refresh();
+  }
 
   function updateField(eventIdx: number, fieldIdx: number, patch: Partial<TemplateFieldRule>) {
     setEvents((prev) =>
@@ -42,6 +98,16 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
         i !== eventIdx ? ev : { ...ev, fields: ev.fields.map((f, j) => (j !== fieldIdx ? f : { ...f, ...patch })) }
       )
     );
+    setDirty(true);
+  }
+
+  function toggleEventOptional(eventIdx: number, optional: boolean) {
+    setEvents((prev) => prev.map((ev, i) => (i !== eventIdx ? ev : { ...ev, optional })));
+    setDirty(true);
+  }
+
+  function removeEvent(eventIdx: number) {
+    setEvents((prev) => prev.filter((_, i) => i !== eventIdx));
     setDirty(true);
   }
 
@@ -118,12 +184,20 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
 
   async function save() {
     setError(null);
+    if (isClick && cleanSteps(steps).length === 0) {
+      setError('A click template needs at least one step.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/templates/${template.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), events: sanitizeTemplateEvents(events) }),
+        body: JSON.stringify({
+          name: name.trim(),
+          events: sanitizeTemplateEvents(events),
+          ...(isClick ? { kind: 'click', steps: cleanSteps(steps) } : {}),
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -151,7 +225,7 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
         setBusy(false);
         return;
       }
-      router.push('/load-events/templates');
+      router.push(listHref);
     } catch {
       setError('Failed to delete template — is the server reachable?');
       setBusy(false);
@@ -165,7 +239,13 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: template.sourceUrl, mode: 'record' }),
+        body: JSON.stringify({
+          projectId,
+          url: template.sourceUrl,
+          mode: 'record',
+          kind: template.kind,
+          ...(isClick ? { steps: cleanSteps(steps) } : {}),
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -178,8 +258,15 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
         templateId: template.id,
         name: template.name,
         url: template.sourceUrl,
+        kind: template.kind,
+        ...(isClick ? { steps: JSON.stringify(cleanSteps(steps)) } : {}),
       });
-      router.push(`/load-events/templates/new?${params.toString()}`);
+      const reRecordBase = backProjectId ?? projectId;
+      router.push(
+        reRecordBase
+          ? `/projects/${reRecordBase}/templates/new?${params.toString()}`
+          : `/templates/new?${params.toString()}`
+      );
     } catch {
       setError('Failed to start re-record — is the server reachable?');
       setBusy(false);
@@ -187,13 +274,17 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
   }
 
   async function runAgainst() {
+    if (!projectId) {
+      setError('Assign this template to a project before running a diff.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: template.sourceUrl, mode: 'diff', templateId: template.id }),
+        body: JSON.stringify({ projectId, url: template.sourceUrl, mode: 'diff', templateId: template.id }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -210,17 +301,71 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Input
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setDirty(true);
-          }}
-          className="h-auto max-w-md border-transparent bg-transparent px-0 text-2xl font-semibold tracking-tight shadow-none focus-visible:border-input focus-visible:bg-background focus-visible:px-2.5"
-        />
-        <p className="mt-1 truncate text-xs text-muted-foreground">{template.sourceUrl}</p>
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs ${
+            isClick ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {isClick && <MousePointerClick className="size-3" />}
+          {isClick ? 'click' : 'page load'}
+        </span>
+        <p className="truncate text-xs text-muted-foreground">{template.sourceUrl}</p>
       </div>
+
+      <div className="flex flex-wrap gap-4">
+        <div className="w-full max-w-md space-y-1.5">
+          <Label htmlFor="template-name">Template name</Label>
+          <Input
+            id="template-name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setDirty(true);
+            }}
+            placeholder='e.g. "Homepage", "Property Search Results"'
+          />
+        </div>
+
+        <div className="w-full max-w-xs space-y-1.5">
+          <Label htmlFor="template-project">Project</Label>
+          <Combobox
+            id="template-project"
+            options={[
+              { value: UNASSIGNED, label: 'Unassigned' },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            value={projectId ?? UNASSIGNED}
+            onValueChange={(v) => changeProject(v && v !== UNASSIGNED ? v : null)}
+            placeholder="Search projects…"
+            emptyText="No projects match."
+          />
+        </div>
+      </div>
+
+      {isClick && (
+        <div className="max-w-lg space-y-3">
+          <ClickableScanner
+            url={template.sourceUrl}
+            steps={steps}
+            onAdd={(step) => {
+              setSteps((prev) =>
+                prev.some((s) => s.target.by === step.target.by && s.target.value === step.target.value)
+                  ? prev
+                  : [...prev, step]
+              );
+              setDirty(true);
+            }}
+          />
+          <StepsEditor
+            value={steps}
+            onChange={(next) => {
+              setSteps(next);
+              setDirty(true);
+            }}
+          />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" onClick={save} disabled={!dirty || saving}>
@@ -261,12 +406,69 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
+      {events.length > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {events.length} events — {openEvents.size} expanded
+          </span>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setAllEventsOpen(true)} className="hover:text-foreground">
+              Expand all
+            </button>
+            <button type="button" onClick={() => setAllEventsOpen(false)} className="hover:text-foreground">
+              Collapse all
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
-        {events.map((ev, eventIdx) => (
-          <Card key={`${ev.eventName}-${ev.occurrenceIndex}`} className="gap-0 p-0">
-            <div className="border-b border-border bg-muted/50 px-4 py-2 font-mono text-sm">
-              {ev.eventName} <span className="text-xs text-muted-foreground">occurrence #{ev.occurrenceIndex}</span>
+        {events.map((ev, eventIdx) => {
+          const eventKey = `${ev.eventName}-${ev.occurrenceIndex}`;
+          const open = openEvents.has(eventKey);
+          return (
+          <Card key={eventKey} className="gap-0 p-0">
+            <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/50 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => toggleEventOpen(eventKey)}
+                aria-expanded={open}
+                className="flex min-w-0 items-center gap-1.5 text-left"
+              >
+                <ChevronRight
+                  className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+                />
+                <span className="truncate font-mono text-sm">
+                  {ev.eventName} <span className="text-xs text-muted-foreground">occurrence #{ev.occurrenceIndex}</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  · {ev.fields.length} field{ev.fields.length === 1 ? '' : 's'}
+                </span>
+                {ev.optional && (
+                  <span className="shrink-0 rounded-sm bg-muted px-1.5 text-xs text-muted-foreground">optional</span>
+                )}
+              </button>
+              <div className="flex shrink-0 items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                  <Checkbox
+                    checked={ev.optional ?? false}
+                    onCheckedChange={(checked) => toggleEventOptional(eventIdx, checked === true)}
+                    aria-label={`Mark ${ev.eventName} as optional`}
+                  />
+                  Optional (don&apos;t flag if this event doesn&apos;t fire)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeEvent(eventIdx)}
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove ${ev.eventName} from this template`}
+                  title="Remove this event from the template"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
             </div>
+            {open && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -280,7 +482,8 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
               </TableHeader>
               <TableBody>
                 {ev.fields.map((f, fieldIdx) => {
-                  const canBeExact = f.type !== 'array' && f.type !== 'object' && f.type !== 'undefined';
+                  // Can use exact match unless the field is an array or object (those are structural only)
+                  const canBeExact = f.type !== 'array' && f.type !== 'object';
                   const hasItemFields = f.type === 'array' && (f.itemFields?.length ?? 0) > 0;
                   const expandKey = `${eventIdx}:${fieldIdx}`;
                   const expanded = hasItemFields && expandedItemFields.has(expandKey);
@@ -311,12 +514,24 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                         </TableCell>
                         <TableCell>
                           {f.classification === 'exact' ? (
-                            <ExactValueInput field={f} onChange={(exactValue) => updateField(eventIdx, fieldIdx, { exactValue })} />
+                            // For undefined/null, there's only one exact value (implicit), so no input needed
+                            f.type === 'undefined' || f.type === 'null' ? (
+                              <span className="text-xs text-muted-foreground italic">{f.type}</span>
+                            ) : (
+                              <ExactValueInput field={f} onChange={(exactValue) => updateField(eventIdx, fieldIdx, { exactValue })} />
+                            )
                           ) : (
                             <span className="text-xs text-muted-foreground">
                               {f.type === 'undefined'
                                 ? '(present, value is undefined)'
-                                : `(any ${f.type}, ${f.allowEmpty ? 'may be empty' : 'non-empty'})`}
+                                : (() => {
+                                    const parts = [`any ${f.type}`];
+                                    if (f.allowEmpty) parts.push('may be empty');
+                                    if (f.allowUndefined) parts.push('may be undefined');
+                                    if (f.allowNull) parts.push('may be null');
+                                    if (!f.allowEmpty && !f.allowUndefined && !f.allowNull) parts.push('non-empty');
+                                    return `(${parts.join(', ')})`;
+                                  })()}
                             </span>
                           )}
                         </TableCell>
@@ -387,7 +602,14 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                                           <span className="text-xs text-muted-foreground">
                                             {itf.type === 'undefined'
                                               ? '(present, value is undefined)'
-                                              : `(any ${itf.type}, ${itf.allowEmpty ? 'may be empty' : 'non-empty'})`}
+                                              : (() => {
+                                                  const parts = [`any ${itf.type}`];
+                                                  if (itf.allowEmpty) parts.push('may be empty');
+                                                  if (itf.allowUndefined) parts.push('may be undefined');
+                                                  if (itf.allowNull) parts.push('may be null');
+                                                  if (!itf.allowEmpty && !itf.allowUndefined && !itf.allowNull) parts.push('non-empty');
+                                                  return `(${parts.join(', ')})`;
+                                                })()}
                                           </span>
                                         )}
                                       </TableCell>
@@ -424,8 +646,10 @@ export function TemplateEditor({ template }: { template: TemplateRow }) {
                 })}
               </TableBody>
             </Table>
+            )}
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -52,9 +52,23 @@ export function compareFieldsAgainstObject(
     }
 
     const allowedTypes = rule.anyOfTypes ?? [rule.type];
-    // When a structural field is marked allowEmpty, undefined is also an allowed type
-    if (rule.classification === 'structural' && (rule.allowEmpty ?? false) && leaf.type === 'undefined') {
-      // undefined is allowed when allowEmpty is true; continue to the structural validity check
+    // When a structural field is marked allowUndefined/allowNull, those types are also allowed
+    if (rule.classification === 'structural') {
+      if ((rule.allowUndefined ?? false) && leaf.type === 'undefined') {
+        // undefined is allowed; continue to validation
+      } else if ((rule.allowNull ?? false) && leaf.type === 'null') {
+        // null is allowed; continue to validation
+      } else if (!allowedTypes.includes(leaf.type)) {
+        diffs.push({
+          path: rule.path,
+          kind: 'type_mismatch',
+          expectedType: rule.type,
+          actualType: leaf.type,
+          expectedValue: rule.exactValue,
+          actualValue: leaf.value,
+        });
+        continue;
+      }
     } else if (!allowedTypes.includes(leaf.type)) {
       diffs.push({
         path: rule.path,

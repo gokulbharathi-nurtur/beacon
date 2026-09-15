@@ -16,8 +16,20 @@ export interface FixtureServer {
 export function serveFixtures(): Promise<FixtureServer> {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
-      const requested = new URL(req.url ?? '/', 'http://localhost').pathname;
-      const file = path.join(FIXTURES_DIR, requested.replace(/^\/+/, ''));
+      const parsed = new URL(req.url ?? '/', 'http://localhost');
+
+      // Delayed-response endpoint: GET /slow?ms=1500 answers after that many ms. Lets a
+      // fixture model a data fetch that keeps the page's network non-idle for a stretch.
+      if (parsed.pathname === '/slow') {
+        const ms = Math.min(Number(parsed.searchParams.get('ms')) || 0, 10_000);
+        setTimeout(() => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{}');
+        }, ms);
+        return;
+      }
+
+      const file = path.join(FIXTURES_DIR, parsed.pathname.replace(/^\/+/, ''));
       if (!file.startsWith(FIXTURES_DIR) || !fs.existsSync(file)) {
         res.writeHead(404);
         res.end();

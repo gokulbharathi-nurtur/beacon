@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — duplicate nested structure</title></head>
+<body>
+
+<!-- Two independent wrappers (e.g. a "Featured" section and a "Similar properties"
+     section) each holding one identically-structured card, 6 levels deep from the link
+     to the outermost distinguishing ancestor — deep enough that the selector
+     generator's capped "smart" climb can't tell the two apart without its guaranteed-
+     unique fallback. -->
+<div>
+  <div class="properties-slide">
+    <article class="property-card">
+      <div class="property-card-content">
+        <div class="property-card-header-group d-flex">
+          <p class="property-card-address"><a href="/a">123 Example Street</a></p>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
+
+<div>
+  <div class="properties-slide">
+    <article class="property-card">
+      <div class="property-card-content">
+        <div class="property-card-header-group d-flex">
+          <p class="property-card-address"><a href="/b">456 Example Avenue</a></p>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
+
+</body>
+</html>

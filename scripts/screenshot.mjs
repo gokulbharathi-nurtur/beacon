@@ -2,12 +2,9 @@ import { chromium } from 'playwright';
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const OUT_DIR = process.argv[3] || '.';
-const PAGES = process.argv[4] ? JSON.parse(process.argv[4]) : [
-  { path: '/load-events', name: 'dashboard' },
-  { path: '/load-events/templates', name: 'templates-list' },
-  { path: '/load-events/templates/new', name: 'templates-new' },
-  { path: '/load-events/content-check', name: 'content-check' },
-];
+// Project-scoped pages need a real project id — pass a JSON array as argv[4] to target them,
+// e.g. '[{"path":"/projects/<id>","name":"dashboard"}]'.
+const PAGES = process.argv[4] ? JSON.parse(process.argv[4]) : [{ path: '/projects', name: 'projects' }];
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });

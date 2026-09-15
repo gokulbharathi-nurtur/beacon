@@ -349,7 +349,7 @@ function ValueText({ value, isPlaceholder }: { value: unknown; isPlaceholder: bo
     return <span className="text-muted-foreground italic">{value as string}</span>;
   }
   if (value === null) return <span className="text-muted-foreground">null</span>;
-  if (value === undefined) return <span className="text-muted-foreground">—</span>;
+  if (value === undefined) return <span className="text-muted-foreground italic">undefined</span>;
   if (typeof value === 'string') return <span className="text-foreground">&quot;{value}&quot;</span>;
   return <span className="text-foreground">{JSON.stringify(value)}</span>;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `event_step_index` text;

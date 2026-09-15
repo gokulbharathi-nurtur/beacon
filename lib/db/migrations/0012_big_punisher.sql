@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `timed_out` integer;

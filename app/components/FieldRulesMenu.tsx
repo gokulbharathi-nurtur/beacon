@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 
 export interface FieldRulesValue {
   allowEmpty?: boolean;
+  allowUndefined?: boolean;
+  allowNull?: boolean;
   expectedCount?: number;
   containsText?: string;
   matchesPattern?: string;
@@ -21,15 +23,22 @@ export interface FieldRulesValue {
   oneOf?: string[];
 }
 
-type RuleOption = 'allowEmpty' | 'expectedCount' | 'containsText' | 'matchesPattern' | 'excludesPattern' | 'oneOf';
+type RuleOption = 'allowEmpty' | 'allowUndefined' | 'allowNull' | 'expectedCount' | 'containsText' | 'matchesPattern' | 'excludesPattern' | 'oneOf';
 
 const OPTIONS_BY_TYPE: Partial<Record<LeafType, RuleOption[]>> = {
-  string: ['allowEmpty', 'containsText', 'matchesPattern', 'excludesPattern', 'oneOf'],
-  array: ['allowEmpty', 'expectedCount'],
+  string: ['allowEmpty', 'allowUndefined', 'allowNull', 'containsText', 'matchesPattern', 'excludesPattern', 'oneOf'],
+  array: ['allowEmpty', 'allowUndefined', 'allowNull', 'expectedCount'],
+  number: ['allowUndefined', 'allowNull'],
+  boolean: ['allowUndefined', 'allowNull'],
+  object: ['allowUndefined', 'allowNull'],
+  null: ['allowUndefined'],
+  undefined: ['allowNull'],
 };
 
 const RULE_LABELS: Record<RuleOption, string> = {
   allowEmpty: 'Allow empty',
+  allowUndefined: 'Allow undefined',
+  allowNull: 'Allow null',
   expectedCount: 'Expected count',
   containsText: 'Contains text',
   matchesPattern: 'Matches pattern (regex)',
@@ -48,6 +57,8 @@ function isValidRegex(pattern: string): boolean {
 
 function isActive(opt: RuleOption, value: FieldRulesValue): boolean {
   if (opt === 'allowEmpty') return !!value.allowEmpty;
+  if (opt === 'allowUndefined') return !!value.allowUndefined;
+  if (opt === 'allowNull') return !!value.allowNull;
   if (opt === 'expectedCount') return value.expectedCount !== undefined;
   if (opt === 'containsText') return value.containsText !== undefined;
   if (opt === 'matchesPattern') return value.matchesPattern !== undefined;
@@ -57,6 +68,8 @@ function isActive(opt: RuleOption, value: FieldRulesValue): boolean {
 
 function removePatch(opt: RuleOption): FieldRulesValue {
   if (opt === 'allowEmpty') return { allowEmpty: false };
+  if (opt === 'allowUndefined') return { allowUndefined: false };
+  if (opt === 'allowNull') return { allowNull: false };
   if (opt === 'expectedCount') return { expectedCount: undefined };
   if (opt === 'containsText') return { containsText: undefined };
   if (opt === 'matchesPattern') return { matchesPattern: undefined };
@@ -66,6 +79,8 @@ function removePatch(opt: RuleOption): FieldRulesValue {
 
 function addPatch(opt: RuleOption): FieldRulesValue {
   if (opt === 'allowEmpty') return { allowEmpty: true };
+  if (opt === 'allowUndefined') return { allowUndefined: true };
+  if (opt === 'allowNull') return { allowNull: true };
   if (opt === 'expectedCount') return { expectedCount: 1 };
   if (opt === 'containsText') return { containsText: '' };
   if (opt === 'matchesPattern') return { matchesPattern: '' };
@@ -103,6 +118,8 @@ export function FieldRulesMenu({
   return (
     <div className="flex flex-wrap items-center gap-1">
       {value.allowEmpty && <Chip label="may be empty" onRemove={() => onChange({ allowEmpty: false })} />}
+      {value.allowUndefined && <Chip label="may be undefined" onRemove={() => onChange({ allowUndefined: false })} />}
+      {value.allowNull && <Chip label="may be null" onRemove={() => onChange({ allowNull: false })} />}
 
       {value.expectedCount !== undefined && (
         <ChipWithInput

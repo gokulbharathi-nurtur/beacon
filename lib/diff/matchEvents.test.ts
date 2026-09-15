@@ -67,4 +67,36 @@ describe('matchEventsByNameAndPosition', () => {
     ]);
     expect(result.countMismatches).toEqual([{ eventName: 'property_click', expectedCount: 2, actualCount: 1 }]);
   });
+
+  it('does not flag an optional event that never fired as missing or a count mismatch', () => {
+    const template = [
+      templateEvent('page_loaded', 0),
+      { eventName: 'cookie_consent', occurrenceIndex: 0, optional: true, fields: [] },
+    ];
+    const result = matchEventsByNameAndPosition(template, [capturedEvent('page_loaded')]);
+    expect(result.matched).toHaveLength(1);
+    expect(result.missing).toHaveLength(0);
+    expect(result.countMismatches).toHaveLength(0);
+  });
+
+  it('still checks an optional event when it does fire', () => {
+    const template = [{ eventName: 'cookie_consent', occurrenceIndex: 0, optional: true, fields: [] }];
+    const result = matchEventsByNameAndPosition(template, [capturedEvent('cookie_consent')]);
+    expect(result.matched).toHaveLength(1);
+    expect(result.missing).toHaveLength(0);
+    expect(result.countMismatches).toHaveLength(0);
+  });
+
+  it('flags only the shortfall below the required (non-optional) count', () => {
+    const template = [
+      templateEvent('property_click', 0),
+      { eventName: 'property_click', occurrenceIndex: 1, optional: true, fields: [] },
+    ];
+    // 1 captured — meets the 1 required, optional one just didn't fire.
+    expect(matchEventsByNameAndPosition(template, [capturedEvent('property_click')]).countMismatches).toHaveLength(0);
+    // 0 captured — below required.
+    expect(matchEventsByNameAndPosition(template, []).countMismatches).toEqual([
+      { eventName: 'property_click', expectedCount: 2, actualCount: 0 },
+    ]);
+  });
 });

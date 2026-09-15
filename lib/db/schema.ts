@@ -1,10 +1,52 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import type { TemplateEvent, RawEvent, FieldDiff, ContentCheckResultStatus } from '@/lib/types';
+import type {
+  TemplateEvent,
+  RawEvent,
+  FieldDiff,
+  ContentCheckResultStatus,
+  InteractionStep,
+  StepResult,
+} from '@/lib/types';
+
+// A project groups all the work for one site — its templates, diff runs, content maps and
+// content checks. Which project a URL belongs to is decided by matching the URL's hostname
+// against projectHostnames (see lib/projects/matchProject.ts).
+export const projects = sqliteTable('projects', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text('name').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+// One hostname that belongs to a project, e.g. "linleyandsimpson2.q.starberry.com" or the
+// production "www.linleyandsimpson.co.uk". Unique so a hostname maps to exactly one
+// project — that's what makes the auto-suggest lookup unambiguous.
+export const projectHostnames = sqliteTable('project_hostnames', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id')
+    .notNull()
+    .references(() => projects.id),
+  hostname: text('hostname').notNull().unique(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 export const templates = sqliteTable('templates', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id').references(() => projects.id),
   name: text('name').notNull().unique(),
   sourceUrl: text('source_url').notNull(),
+  // What the template's events are triggered by. 'pageload' = capture on navigation (the
+  // original and only pre-existing behaviour); 'click' = capture after performing `steps`.
+  kind: text('kind', { enum: ['pageload', 'click'] }).notNull().default('pageload'),
+  // Ordered interactions performed after load before the capture settles. Null/empty for
+  // 'pageload'; at least one entry for 'click'.
+  steps: text('steps', { mode: 'json' }).$type<InteractionStep[]>(),
   events: text('events', { mode: 'json' }).$type<TemplateEvent[]>().notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
@@ -16,10 +58,32 @@ export const templates = sqliteTable('templates', {
 
 export const runs = sqliteTable('runs', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id').references(() => projects.id),
+  // Human label. User-supplied when given, otherwise derived from the target URL's path
+  // (see lib/runs/deriveRunName.ts) at creation time.
+  name: text('name'),
   targetUrl: text('target_url').notNull(),
+  // Primary template = templateIds[0]; kept as a real FK so deleting a template can null
+  // it out and legacy rows (pre-multi-template) still resolve.
   templateId: text('template_id').references(() => templates.id),
-  // 'record' captures a fresh golden template; 'diff' checks a live page against one.
+  // The full ordered list a diff run is compared against (1-2 entries). Null on rows
+  // created before multi-template support — readers fall back to [templateId].
+  templateIds: text('template_ids', { mode: 'json' }).$type<string[]>(),
+  // 'record' captures a fresh golden template; 'diff' checks a live page against one or two.
   mode: text('mode', { enum: ['diff', 'record'] }).notNull(),
+  // Mirrors the template's `kind`. A diff run copies this + `steps` from its primary
+  // template at creation; a record run gets them from the record form. Legacy rows are
+  // 'pageload' via the column default.
+  kind: text('kind', { enum: ['pageload', 'click'] }).notNull().default('pageload'),
+  // Snapshot of the interaction steps this run actually executed — copied at creation so a
+  // later edit to the source template doesn't rewrite run history.
+  steps: text('steps', { mode: 'json' }).$type<InteractionStep[]>(),
+  // One entry per step attempted, filled in by the capture. Null for 'pageload' runs.
+  stepResults: text('step_results', { mode: 'json' }).$type<StepResult[]>(),
+  // Parallel to capturedEvents — eventStepIndex[i] is the step index that triggered
+  // capturedEvents[i], or null if it fired before any step (page load). Null for
+  // 'pageload' runs, which have no steps to attribute against.
+  eventStepIndex: text('event_step_index', { mode: 'json' }).$type<(number | null)[]>(),
   status: text('status', { enum: ['queued', 'running', 'complete', 'error'] })
     .notNull()
     .default('queued'),
@@ -28,6 +92,9 @@ export const runs = sqliteTable('runs', {
   rawPushCount: integer('raw_push_count'),
   nonEventPushCount: integer('non_event_push_count'),
   nonEventPushes: text('non_event_pushes', { mode: 'json' }).$type<unknown[]>(),
+  // True when the settle logic hit its hard ceiling instead of a natural quiet period —
+  // pushes may still have been arriving, so late events could be missing.
+  timedOut: integer('timed_out', { mode: 'boolean' }),
   startedAt: integer('started_at', { mode: 'timestamp' }),
   finishedAt: integer('finished_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' })
@@ -39,6 +106,7 @@ export const runs = sqliteTable('runs', {
 // expected content_group/content_id/content_type table the content check validates against.
 export const contentMaps = sqliteTable('content_maps', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id').references(() => projects.id),
   name: text('name').notNull(),
   sourceFilename: text('source_filename'),
   createdAt: integer('created_at', { mode: 'timestamp' })
@@ -71,6 +139,7 @@ export const contentMapRules = sqliteTable('content_map_rules', {
 
 export const contentChecks = sqliteTable('content_checks', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id').references(() => projects.id),
   contentMapId: text('content_map_id')
     .notNull()
     .references(() => contentMaps.id),
@@ -119,6 +188,8 @@ export const contentCheckResults = sqliteTable('content_check_results', {
     .$defaultFn(() => new Date()),
 });
 
+export type ProjectRow = typeof projects.$inferSelect;
+export type ProjectHostnameRow = typeof projectHostnames.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type RunRow = typeof runs.$inferSelect;
 export type ContentMapRow = typeof contentMaps.$inferSelect;

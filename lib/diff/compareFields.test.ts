@@ -141,6 +141,68 @@ describe('compareEventFields', () => {
     expect(compareEventFields(template, captured)).toEqual([]);
   });
 
+  it('does not flag undefined as a type mismatch when the structural field is marked allowUndefined', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'tenure', classification: 'structural', type: 'string', allowUndefined: true },
+      ],
+    };
+    const captured: RawEvent = { event: 'view_property_list', tenure: undefined };
+    expect(compareEventFields(template, captured)).toEqual([]);
+  });
+
+  it('does not flag null as a type mismatch when the structural field is marked allowNull', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'sidebar_open', classification: 'structural', type: 'string', allowNull: true },
+      ],
+    };
+    const captured: RawEvent = { event: 'view_property_list', sidebar_open: null };
+    expect(compareEventFields(template, captured)).toEqual([]);
+  });
+
+  it('honours allowUndefined on item-level fields inside an array', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        {
+          path: 'property_list_details',
+          classification: 'structural',
+          type: 'array',
+          itemFields: [{ path: 'tenure', classification: 'structural', type: 'string', allowUndefined: true }],
+        },
+      ],
+    };
+    const captured: RawEvent = {
+      event: 'view_property_list',
+      property_list_details: [{ tenure: 'Freehold' }, { tenure: undefined }],
+    };
+    expect(compareEventFields(template, captured)).toEqual([]);
+  });
+
+  it('still flags undefined as a type mismatch when allowUndefined is absent', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'tenure', classification: 'structural', type: 'string' },
+      ],
+    };
+    const captured: RawEvent = { event: 'view_property_list', tenure: undefined };
+    expect(compareEventFields(template, captured)).toEqual([
+      { path: 'tenure', kind: 'type_mismatch', expectedType: 'string', actualType: 'undefined', expectedValue: undefined, actualValue: undefined },
+    ]);
+  });
+
   it('still flags an empty array as a violation when allowEmpty is absent, even for other structural fields', () => {
     const template: TemplateEvent = {
       eventName: 'page_loaded',

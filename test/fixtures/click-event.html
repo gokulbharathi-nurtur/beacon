@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — click-triggered event</title></head>
+<body>
+<h1>Property</h1>
+
+<button id="book-viewing" class="property-cta">Book a viewing</button>
+
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  // Only fires on click — the whole point of a click-event template.
+  document.getElementById('book-viewing').addEventListener('click', function () {
+    window.dataLayer.push({ event: 'cta_click', cta: 'book_viewing' });
+  });
+</script>
+</body>
+</html>

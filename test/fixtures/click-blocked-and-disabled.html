@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Capture engine fixture — disabled target / overlay-blocked click</title>
+  <style>
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      z-index: 999;
+    }
+    #overlay.shown { display: block; }
+  </style>
+</head>
+<body>
+<h1>Carousel</h1>
+
+<!-- Disabled until "Next" has moved the carousel forward — exactly how a real carousel's
+     "previous" arrow behaves on the first slide. -->
+<button id="prev" aria-label="Previous properties" disabled type="button">Previous properties</button>
+<button id="next" aria-label="Next properties" type="button">Next properties</button>
+<button id="later" type="button">Later button</button>
+
+<!-- Stands in for a consent backdrop that only renders once the page is first
+     interacted with, then intercepts every subsequent click. -->
+<div id="overlay"></div>
+
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+
+  document.getElementById('next').addEventListener('click', function () {
+    window.dataLayer.push({ event: 'carousel_scroll' });
+    document.getElementById('prev').disabled = false;
+    document.getElementById('overlay').classList.add('shown');
+  });
+  document.getElementById('prev').addEventListener('click', function () {
+    window.dataLayer.push({ event: 'carousel_scroll_back' });
+  });
+</script>
+</body>
+</html>

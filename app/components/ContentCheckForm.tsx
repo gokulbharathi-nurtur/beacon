@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export function ContentCheckForm({ maps }: { maps: { id: string; name: string }[] }) {
+export function ContentCheckForm({ projectId, maps }: { projectId: string; maps: { id: string; name: string }[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<'site' | 'page'>('site');
   const [baseUrl, setBaseUrl] = useState('');
@@ -30,7 +30,7 @@ export function ContentCheckForm({ maps }: { maps: { id: string; name: string }[
       const res = await fetch('/api/content-checks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, contentMapId, mode }),
+        body: JSON.stringify({ projectId, baseUrl, contentMapId, mode }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -38,7 +38,7 @@ export function ContentCheckForm({ maps }: { maps: { id: string; name: string }[
         setSubmitting(false);
         return;
       }
-      router.push(`/load-events/content-check/${body.id}`);
+      router.push(`/projects/${projectId}/content-check/${body.id}`);
     } catch {
       setError('Failed to start content check — is the server reachable?');
       setSubmitting(false);

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Capture engine fixture — clickable discovery</title>
+  <style>
+    .fake-link { cursor: pointer; display: inline-block; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<h1>Listing</h1>
+
+<button id="book-viewing">Book a viewing</button>
+<a href="/branches/leeds">Call the Leeds branch</a>
+<div class="fake-link" role="button">Save property</div>
+<span class="fake-link">Share</span>
+
+<button class="hidden">Never visible</button>
+<div>Just some text, not clickable</div>
+
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ event: 'page_loaded' });
+</script>
+</body>
+</html>

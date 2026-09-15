@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capture engine fixture — late async event</title></head>
+<body>
+<h1>Property list</h1>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  // Fires immediately, like page_loaded.
+  window.dataLayer.push({ event: 'list_page_loaded' });
+
+  // Models a data-driven list: an async fetch, then the "viewed this list" push only
+  // once the data is back. The fetch keeps the page's network non-idle for ~1.5s, well
+  // past a short quiet window — so only the networkidle wait in runCapture catches it.
+  fetch('/slow?ms=1500')
+    .then(function () {
+      window.dataLayer.push({ event: 'view_list_loaded', item_count: 12 });
+    });
+</script>
+</body>
+</html>

@@ -26,7 +26,11 @@ export function matchEventsByNameAndPosition(
     const templateGroup = templateByName.get(eventName) ?? [];
     const capturedGroup = capturedByName.get(eventName) ?? [];
 
-    if (templateGroup.length !== capturedGroup.length) {
+    // Optional template events may legitimately not fire, so the required count is the
+    // number of non-optional ones; anything from there up to the full template count is
+    // acceptable. Only a shortfall below required, or more than expected, is a mismatch.
+    const requiredCount = templateGroup.filter((e) => !e.optional).length;
+    if (capturedGroup.length < requiredCount || capturedGroup.length > templateGroup.length) {
       result.countMismatches.push({
         eventName,
         expectedCount: templateGroup.length,
@@ -44,6 +48,7 @@ export function matchEventsByNameAndPosition(
       });
     }
     for (let i = pairedCount; i < templateGroup.length; i++) {
+      if (templateGroup[i].optional) continue;
       result.missing.push({ eventName, occurrenceIndex: i, templateEvent: templateGroup[i] });
     }
     for (let i = pairedCount; i < capturedGroup.length; i++) {

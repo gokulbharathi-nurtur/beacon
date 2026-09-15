@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `template_ids` text;
