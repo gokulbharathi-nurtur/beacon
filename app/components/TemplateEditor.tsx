@@ -521,18 +521,7 @@ export function TemplateEditor({
                               <ExactValueInput field={f} onChange={(exactValue) => updateField(eventIdx, fieldIdx, { exactValue })} />
                             )
                           ) : (
-                            <span className="text-xs text-muted-foreground">
-                              {f.type === 'undefined'
-                                ? '(present, value is undefined)'
-                                : (() => {
-                                    const parts = [`any ${f.type}`];
-                                    if (f.allowEmpty) parts.push('may be empty');
-                                    if (f.allowUndefined) parts.push('may be undefined');
-                                    if (f.allowNull) parts.push('may be null');
-                                    if (!f.allowEmpty && !f.allowUndefined && !f.allowNull) parts.push('non-empty');
-                                    return `(${parts.join(', ')})`;
-                                  })()}
-                            </span>
+                            <span className="text-xs text-muted-foreground">{describeStructuralRule(f)}</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -599,18 +588,7 @@ export function TemplateEditor({
                                             onChange={(exactValue) => updateItemField(eventIdx, fieldIdx, itemFieldIdx, { exactValue })}
                                           />
                                         ) : (
-                                          <span className="text-xs text-muted-foreground">
-                                            {itf.type === 'undefined'
-                                              ? '(present, value is undefined)'
-                                              : (() => {
-                                                  const parts = [`any ${itf.type}`];
-                                                  if (itf.allowEmpty) parts.push('may be empty');
-                                                  if (itf.allowUndefined) parts.push('may be undefined');
-                                                  if (itf.allowNull) parts.push('may be null');
-                                                  if (!itf.allowEmpty && !itf.allowUndefined && !itf.allowNull) parts.push('non-empty');
-                                                  return `(${parts.join(', ')})`;
-                                                })()}
-                                          </span>
+                                          <span className="text-xs text-muted-foreground">{describeStructuralRule(itf)}</span>
                                         )}
                                       </TableCell>
                                       <TableCell>
@@ -653,6 +631,26 @@ export function TemplateEditor({
       </div>
     </div>
   );
+}
+
+/** Plain-English summary of a structural rule, shown in the "Expected value" column. */
+function describeStructuralRule(f: TemplateFieldRule): string {
+  if (f.type === 'undefined') {
+    const parts: string[] = [];
+    if (f.allowNull) parts.push('may be null');
+    if (f.containsText !== undefined) parts.push(`contains "${f.containsText}"`);
+    if (f.matchesPattern !== undefined) parts.push(`matches /${f.matchesPattern}/`);
+    if (f.excludesPattern !== undefined) parts.push(`excludes /${f.excludesPattern}/`);
+    if (f.oneOf !== undefined && f.oneOf.length > 0) parts.push(`one of ${f.oneOf.join(', ')}`);
+    if (f.allowEmpty) parts.push('may be empty');
+    return parts.length === 0 ? '(present, value is undefined)' : `(usually undefined, or a string — ${parts.join(', ')})`;
+  }
+  const parts = [`any ${f.type}`];
+  if (f.allowEmpty) parts.push('may be empty');
+  if (f.allowUndefined) parts.push('may be undefined');
+  if (f.allowNull) parts.push('may be null');
+  if (!f.allowEmpty && !f.allowUndefined && !f.allowNull) parts.push('non-empty');
+  return `(${parts.join(', ')})`;
 }
 
 function ExactValueInput({ field, onChange }: { field: TemplateFieldRule; onChange: (value: string | number | boolean | null) => void }) {

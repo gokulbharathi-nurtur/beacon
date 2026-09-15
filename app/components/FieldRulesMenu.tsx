@@ -32,7 +32,13 @@ const OPTIONS_BY_TYPE: Partial<Record<LeafType, RuleOption[]>> = {
   boolean: ['allowUndefined', 'allowNull'],
   object: ['allowUndefined', 'allowNull'],
   null: ['allowUndefined'],
-  undefined: ['allowNull'],
+  // A field recorded as undefined is very often *sometimes* a real string on other runs
+  // (a promotion badge, a discount label — blank most of the time, set when it applies).
+  // Same shape-rule set as 'string' (minus allowUndefined, which is redundant — the
+  // field's whole premise is that undefined is already expected) so those runs can be
+  // constrained too; the diff engine only starts accepting a string at all once one of
+  // these is actually set (see compareFields.ts).
+  undefined: ['allowNull', 'allowEmpty', 'containsText', 'matchesPattern', 'excludesPattern', 'oneOf'],
 };
 
 const RULE_LABELS: Record<RuleOption, string> = {

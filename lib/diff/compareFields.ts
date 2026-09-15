@@ -52,12 +52,27 @@ export function compareFieldsAgainstObject(
     }
 
     const allowedTypes = rule.anyOfTypes ?? [rule.type];
+    // A structural 'undefined' rule that also carries a string-shape check (contains/
+    // matches/excludes/one-of) or allowEmpty is opting in to "usually undefined, but
+    // when it's actually a string, constrain it" — setting any of those is what turns
+    // that acceptance on, so a plain undefined-typed rule with no such option keeps its
+    // original strict "must stay undefined (or null, with allowNull)" meaning.
+    const undefinedMayBeString =
+      rule.type === 'undefined' &&
+      (rule.allowEmpty ||
+        rule.containsText !== undefined ||
+        rule.matchesPattern !== undefined ||
+        rule.excludesPattern !== undefined ||
+        (rule.oneOf?.length ?? 0) > 0);
     // When a structural field is marked allowUndefined/allowNull, those types are also allowed
     if (rule.classification === 'structural') {
       if ((rule.allowUndefined ?? false) && leaf.type === 'undefined') {
         // undefined is allowed; continue to validation
       } else if ((rule.allowNull ?? false) && leaf.type === 'null') {
         // null is allowed; continue to validation
+      } else if (undefinedMayBeString && leaf.type === 'string') {
+        // a real string turned up where undefined was recorded, and this rule opted in
+        // to allowing that — continue to the string-shape checks below
       } else if (!allowedTypes.includes(leaf.type)) {
         diffs.push({
           path: rule.path,
@@ -112,7 +127,7 @@ export function compareFieldsAgainstObject(
     // same reasoning as the array/expectedCount case above. Rules are independent: a
     // field can have any combination, and each violated one produces its own diff.
     if (
-      rule.type === 'string' &&
+      (rule.type === 'string' || (undefinedMayBeString && leaf.type === 'string')) &&
       (rule.containsText !== undefined ||
         rule.matchesPattern !== undefined ||
         rule.excludesPattern !== undefined ||

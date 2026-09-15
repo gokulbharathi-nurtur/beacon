@@ -203,6 +203,61 @@ describe('compareEventFields', () => {
     ]);
   });
 
+  it('accepts a string for an undefined-typed field once a string-shape rule is attached', () => {
+    // property_promotion was undefined at record time (this property had no promotion),
+    // but a real run can have it set to a promo label — oneOf constrains what that
+    // label may be instead of always demanding it stays undefined.
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'property_promotion', classification: 'structural', type: 'undefined', oneOf: ['NEW INSTRUCTION', 'PRICE REDUCED'] },
+      ],
+    };
+    expect(
+      compareEventFields(template, { event: 'view_property_list', property_promotion: undefined })
+    ).toEqual([]);
+    expect(
+      compareEventFields(template, { event: 'view_property_list', property_promotion: 'PRICE REDUCED' })
+    ).toEqual([]);
+  });
+
+  it('flags a string that violates an undefined-typed field\'s attached shape rule', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'property_promotion', classification: 'structural', type: 'undefined', oneOf: ['NEW INSTRUCTION', 'PRICE REDUCED'] },
+      ],
+    };
+    expect(compareEventFields(template, { event: 'view_property_list', property_promotion: 'SOLD STC' })).toEqual([
+      { path: 'property_promotion', kind: 'value_not_in_set', expectedValue: ['NEW INSTRUCTION', 'PRICE REDUCED'], actualValue: 'SOLD STC' },
+    ]);
+  });
+
+  it('still rejects a string for a plain undefined-typed field with no shape rule attached', () => {
+    const template: TemplateEvent = {
+      eventName: 'view_property_list',
+      occurrenceIndex: 0,
+      fields: [
+        { path: 'event', classification: 'exact', type: 'string', exactValue: 'view_property_list' },
+        { path: 'property_promotion', classification: 'structural', type: 'undefined' },
+      ],
+    };
+    expect(compareEventFields(template, { event: 'view_property_list', property_promotion: 'PRICE REDUCED' })).toEqual([
+      {
+        path: 'property_promotion',
+        kind: 'type_mismatch',
+        expectedType: 'undefined',
+        actualType: 'string',
+        expectedValue: undefined,
+        actualValue: 'PRICE REDUCED',
+      },
+    ]);
+  });
+
   it('still flags an empty array as a violation when allowEmpty is absent, even for other structural fields', () => {
     const template: TemplateEvent = {
       eventName: 'page_loaded',
